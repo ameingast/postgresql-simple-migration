@@ -24,8 +24,7 @@ import qualified Data.ByteString.Base64           as B64 (encode)
 import           Data.List                        (isPrefixOf, sort)
 import           Data.Monoid                      (mconcat)
 import           Database.PostgreSQL.Simple       (Connection, Only (..),
-                                                   execute, execute_, query,
-                                                   withTransaction)
+                                                   execute, execute_, query)
 import           Database.PostgreSQL.Simple.Types (Query (..))
 import           System.Directory                 (getDirectoryContents)
 
@@ -57,9 +56,9 @@ executeDirectoryMigration con verbose dir =
                     go fs
 
 -- | Executes a generic SQL migration for the provided script 'name' with
--- content 'contents'. Execution happens inside a database transaction.
+-- content 'contents'.
 executeMigration :: Connection -> Bool -> ScriptName -> BS.ByteString -> IO (MigrationResult String)
-executeMigration con verbose name contents = withTransaction con $ do
+executeMigration con verbose name contents = do
     let checksum = md5Hash contents
     checkScript con name checksum >>= \r -> case r of
         ScriptOk -> do
