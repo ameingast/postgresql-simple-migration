@@ -13,6 +13,7 @@ module Database.PostgreSQL.Simple.Migration
     ( runMigration
     , MigrationContext(..)
     , MigrationCommand(..)
+    , MigrationResult(..)
     , ScriptName
     ) where
 
