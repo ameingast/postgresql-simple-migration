@@ -54,6 +54,7 @@ executeDirectoryMigration con verbose dir =
                     return r
                 MigrationSuccess ->
                     go fs
+
 -- | Executes a generic SQL migration for the provided script 'name' with
 -- content 'contents'. Execution happens inside a database transaction.
 executeMigration :: Connection -> Bool -> ScriptName -> BS.ByteString -> IO (MigrationResult String)

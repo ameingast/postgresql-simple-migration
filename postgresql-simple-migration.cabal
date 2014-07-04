@@ -7,9 +7,10 @@ license:                    BSD3
 license-file:               License
 author:                     Andreas Meingast <ameingast@gmail.com>
 maintainer:                 Andreas Meingast <ameingast@gmail.com>
+copyright:                  2014, Andreas Meingast
 category:                   Database
 build-type:                 Simple
-cabal-version:              >= 1.8
+cabal-version:              >= 1.10
 description:                A PostgreSQL-simple schema migration utility
 
 extra-source-files:         README.markdown
@@ -23,7 +24,8 @@ Library
     exposed-modules:        Database.PostgreSQL.Simple.Migration
     hs-source-dirs:         src
     ghc-options:            -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns
-    extensions:             OverloadedStrings
+    default-extensions:     OverloadedStrings
+    default-language:       Haskell2010
     build-depends:          base                        >= 4.6      && < 5.0,
                             base64-bytestring           >= 1.0      && < 1.1,
                             bytestring                  >= 0.10     && < 0.11,
@@ -35,7 +37,8 @@ Executable migrate
     main-is:                Main.hs
     hs-source-dirs:         src
     ghc-options:            -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns
-    extensions:             OverloadedStrings
+    default-extensions:     OverloadedStrings
+    default-language:       Haskell2010
     build-depends:          base                        >= 4.6      && < 5.0,
                             base64-bytestring           >= 1.0      && < 1.1,
                             bytestring                  >= 0.10     && < 0.11,
