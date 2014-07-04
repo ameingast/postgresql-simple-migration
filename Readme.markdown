@@ -1,4 +1,7 @@
 # PostgreSQL Migrations for Haskell
+
+[![Build Status](https://api.travis-ci.org/ameingast/postgresql-simple-migration.png)](https://travis-ci.org/ameingast/postgresql-simple-migration)
+
 Welcome to postgresql-simple-migrations, a tool for helping you with 
 PostgreSQL schema migrations.
 
