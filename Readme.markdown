@@ -43,5 +43,6 @@ a standalone binary.
 ### Haskell Library
 
 ## To Do
-* Version syntax for SQL text-files
-* Validate command for the standalone program
+* Collect executed scripts and check if already executed scripts have been
+  deleted.
+* Validate command for the standalone program.

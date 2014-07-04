@@ -1,8 +1,19 @@
+-- |
+-- Module      : Database.PostgreSQL.Simple.Migration
+-- Copyright   : (c) 2014 Andreas Meingast <ameingast@gmail.com>
+--
+-- License     : BSD-style
+-- Maintainer  : ameingast@gmail.com
+-- Stability   : experimental
+-- Portability : GHC
+--
+-- Migration library for postgresql-simple.
+
 module Database.PostgreSQL.Simple.Migration
-    ( runMigrations
-    , initializeMigrations
+    ( runMigration
     , MigrationContext(..)
-    , SchemaVersion(..)
+    , MigrationCommand(..)
+    , ScriptName
     ) where
 
 import           Control.Monad                    (liftM, void, when)
@@ -17,42 +28,54 @@ import           Database.PostgreSQL.Simple       (Connection, Only (..),
 import           Database.PostgreSQL.Simple.Types (Query (..))
 import           System.Directory                 (getDirectoryContents)
 
-runMigrations :: MigrationContext -> IO (MigrationResult String)
-runMigrations (MigrationContext dir verbose con) =
-    liftM (filter (\x -> not $ "." `isPrefixOf` x)) (getDirectoryContents dir) >>= go . sort
+-- | Executes migrations inside the provided 'MigrationContext'.
+runMigration :: MigrationContext -> IO (MigrationResult String)
+runMigration (MigrationContext cmd verbose con) = case cmd of
+    MigrationInitialization ->
+        initializeSchema con verbose >> return MigrationSuccess
+    MigrationDirectory path ->
+       executeDirectoryMigration con verbose path
+    MigrationScript name contents ->
+        executeMigration con verbose name contents
+    MigrationFile name path ->
+        executeMigration con verbose name =<< BS.readFile path
+
+-- | Executes all SQL-file based migrations located in the provided 'dir'.
+executeDirectoryMigration :: Connection -> Bool -> FilePath -> IO (MigrationResult String)
+executeDirectoryMigration con verbose dir =
+    liftM (filter (\x -> not $ "." `isPrefixOf` x))
+        (getDirectoryContents dir) >>= go . sort
     where
         go [] = return MigrationSuccess
-        go (f:fs) =
-            runMigration con verbose dir f >>= \r -> case r of
+        go (f:fs) = do
+            r <- executeMigration con verbose f =<< BS.readFile (dir ++ "/" ++ f)
+            case r of
                 MigrationError _ ->
                     return r
                 MigrationSuccess ->
                     go fs
-
-initializeMigrations :: MigrationContext -> IO (MigrationResult String)
-initializeMigrations (MigrationContext _dir verbose con) =
-    initializeSchema con verbose >> return MigrationSuccess
-
-runMigration :: Connection -> Bool -> FilePath -> FilePath -> IO (MigrationResult String)
-runMigration con verbose dir filename = withTransaction con $ do
-    let path = dir ++ "/" ++ filename
-    contents <- BS.readFile path
+-- | Executes a generic SQL migration for the provided script 'name' with
+-- content 'contents'. Execution happens inside a database transaction.
+executeMigration :: Connection -> Bool -> ScriptName -> BS.ByteString -> IO (MigrationResult String)
+executeMigration con verbose name contents = withTransaction con $ do
     let checksum = md5Hash contents
-    checkFile con filename checksum >>= \r -> case r of
+    checkScript con name checksum >>= \r -> case r of
         ScriptOk -> do
-            when verbose $ putStrLn $ "Ok:\t" ++ filename
+            when verbose $ putStrLn $ "Ok:\t" ++ name
             return MigrationSuccess
-        ScriptMissing -> do
+        ScriptNotExecuted -> do
             void $ execute_ con (Query contents)
-            void $ execute con q (filename, checksum)
-            when verbose $ putStrLn $ "Execute:\t" ++ filename
+            void $ execute con q (name, checksum)
+            when verbose $ putStrLn $ "Execute:\t" ++ name
             return MigrationSuccess
         ScriptModified _ -> do
-            when verbose $ putStrLn $ "Fail:\t" ++ filename
-            return (MigrationError filename)
+            when verbose $ putStrLn $ "Fail:\t" ++ name
+            return (MigrationError name)
     where
         q = "insert into schema_migrations(filename, checksum) values(?, ?) "
 
+-- | Initializes the database schema with a helper table containing
+-- meta-information about executed migrations.
 initializeSchema :: Connection -> Bool -> IO ()
 initializeSchema con verbose = do
     when verbose $ putStrLn "Initializing schema"
@@ -64,11 +87,16 @@ initializeSchema con verbose = do
         , ");"
         ]
 
-checkFile :: Connection -> FilePath -> Checksum -> IO CheckScriptResult
-checkFile con filename checksum =
-    query con q (Only filename) >>= \r -> case r of
+-- | Checks the status of the script with the given name 'name'.
+-- If the script has already been executed, the checksum of the script
+-- is compared against the one that was executed.
+-- If there is no matching script entry in the database, the script
+-- will be executed and its meta-information will be recorded.
+checkScript :: Connection -> ScriptName -> Checksum -> IO CheckScriptResult
+checkScript con name checksum =
+    query con q (Only name) >>= \r -> case r of
         [] ->
-            return ScriptMissing
+            return ScriptNotExecuted
         Only actualChecksum:_ | checksum == actualChecksum ->
             return ScriptOk
         Only actualChecksum:_ ->
@@ -79,25 +107,59 @@ checkFile con filename checksum =
             , "where filename = ? limit 1"
             ]
 
-md5Hash :: Checksum -> Checksum
+-- | Calculates the MD5 checksum of the provided bytestring in base64
+-- encoding.
+md5Hash :: BS.ByteString -> Checksum
 md5Hash = B64.encode . MD5.hash
 
+-- | The checksum type of a migration script.
 type Checksum = BS.ByteString
-newtype SchemaVersion = SchemaVersion String deriving (Show, Eq, Read, Ord)
 
+-- | The name of a script. Typically the filename or a custom name
+-- when using Haskell migrations.
+type ScriptName = String
+
+-- | 'MigrationCommand' determines the action of the 'runMigration' script.
+data MigrationCommand
+    = MigrationInitialization
+    -- ^ Initializes the database with a helper table containing meta
+    -- information.
+    | MigrationDirectory FilePath
+    -- ^ Executes migrations based on SQL scripts in the provided 'FilePath'
+    -- in alphabetical order.
+    | MigrationFile ScriptName FilePath
+    -- ^ Executes a migration based on script located at the provided
+    -- 'FilePath'.
+    | MigrationScript ScriptName BS.ByteString
+    -- ^ Executes a migration based on the provided bytestring.
+    deriving (Show, Eq, Read, Ord)
+
+-- | A sum-type denoting the result of a single migration.
 data CheckScriptResult
     = ScriptOk
+    -- ^ The script has already been executed and the checksums match.
+    -- This is good.
     | ScriptModified Checksum
-    | ScriptMissing
+    -- ^ The script has already been executed and there is a checksum
+    -- mismatch. This is bad.
+    | ScriptNotExecuted
+    -- ^ The script has not been executed, yet. This is good.
     deriving (Show, Eq, Read, Ord)
 
+-- | A sum-type denoting the result of a migration.
 data MigrationResult a
     = MigrationError a
+    -- ^ There was an error in script migration.
     | MigrationSuccess
+    -- ^ All scripts have been executed successfully.
     deriving (Show, Eq, Read, Ord)
 
+-- | The 'MigrationContext' provides an execution context for migrations.
 data MigrationContext = MigrationContext
-    { migrationContextBasePath   :: FilePath
+    { migrationContextCommand    :: MigrationCommand
+    -- ^ The action that will be performed by 'runMigration'
     , migrationContextVerbose    :: Bool
+    -- ^ Verbosity of the library.
     , migrationContextConnection :: Connection
+    -- ^ The PostgreSQL connection to use for migrations.
     }
