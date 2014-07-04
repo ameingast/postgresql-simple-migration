@@ -38,6 +38,24 @@ migrationSpec con = describe "runMigration" $ do
         r <- runMigration $
             MigrationContext (MigrationScript "test.sql" "") False con
         r `shouldBe` MigrationError "test.sql"
+
+    it "executes migration scripts inside a folder" $ do
+        r <- runMigration $
+            MigrationContext (MigrationDirectory "share/test/scripts") False con
+        r `shouldBe` MigrationSuccess
+
+    it "creates the table from the executed scripts" $ do
+        r <- existsTable con "t2"
+        r `shouldBe` True
+
+    it "executes a file based migration script" $ do
+        r <- runMigration $
+            MigrationContext (MigrationFile "s.sql" "share/test/script.sql") False con
+        r `shouldBe` MigrationSuccess
+
+    it "creates the table from the executed scripts" $ do
+        r <- existsTable con "t3"
+        r `shouldBe` True
     where
         t1 = "create table t1 (c1 varchar);"
 
