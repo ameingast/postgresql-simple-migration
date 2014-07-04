@@ -5,7 +5,10 @@ module Database.PostgreSQL.Simple.MigrationTest where
 import           Control.Monad                        (liftM)
 import           Database.PostgreSQL.Simple           (Connection, Only (..),
                                                        query)
-import           Database.PostgreSQL.Simple.Migration
+import           Database.PostgreSQL.Simple.Migration (MigrationCommand (..),
+                                                       MigrationContext (..),
+                                                       MigrationResult (..),
+                                                       runMigration)
 import           Test.Hspec                           (Spec, describe, it,
                                                        shouldBe)
 

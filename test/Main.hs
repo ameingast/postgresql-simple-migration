@@ -2,6 +2,7 @@ module Main
     ( main
     ) where
 
+import           Control.Exception                        (finally)
 import           Database.PostgreSQL.Simple               (connectPostgreSQL,
                                                            rollback,
                                                            withTransaction)
@@ -11,5 +12,8 @@ import           Test.Hspec                               (hspec)
 main :: IO ()
 main = do
     con <- connectPostgreSQL "dbname=test"
-    withTransaction con $ hspec (migrationSpec con) >> rollback con
+    withTransaction con $ finally
+        (hspec (migrationSpec con))
+        (rollback con)
+
 
