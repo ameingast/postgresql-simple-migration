@@ -25,7 +25,7 @@ migrationSpec con = describe "runMigration" $ do
 
     it "executes a migration script" $ do
         r <- runMigration $
-            MigrationContext (MigrationScript "test.sql" t1) False con
+            MigrationContext (MigrationScript "test.sql" q) False con
         r `shouldBe` MigrationSuccess
 
     it "creates the table from the executed script" $ do
@@ -34,7 +34,7 @@ migrationSpec con = describe "runMigration" $ do
 
     it "skips execution of the same migration script" $ do
         r <- runMigration $
-            MigrationContext (MigrationScript "test.sql" t1) False con
+            MigrationContext (MigrationScript "test.sql" q) False con
         r `shouldBe` MigrationSuccess
 
     it "reports an error on a different checksum for the same script" $ do
@@ -60,7 +60,7 @@ migrationSpec con = describe "runMigration" $ do
         r <- existsTable con "t3"
         r `shouldBe` True
     where
-        t1 = "create table t1 (c1 varchar);"
+        q = "create table t1 (c1 varchar);"
 
 existsTable :: Connection -> String -> IO Bool
 existsTable con table =
