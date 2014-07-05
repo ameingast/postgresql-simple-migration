@@ -1,6 +1,6 @@
 name:                       postgresql-simple-migration
 version:                    0.1.0.0
-synopsis:                   A PostgreSQL-simple schema migration utility
+synopsis:                   PostgreSQL Schema Migrations
 homepage:                   https://github.com/ameingast/postgresql-simple-migration
 Bug-reports:                https://github.com/ameingast/postgresql-simple-migration/issues
 license:                    BSD3
