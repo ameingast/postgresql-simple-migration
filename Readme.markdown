@@ -2,19 +2,19 @@
 
 [![Build Status](https://api.travis-ci.org/ameingast/postgresql-simple-migration.png)](https://travis-ci.org/ameingast/postgresql-simple-migration)
 
-Welcome to postgresql-simple-migrations, a tool for helping you with 
+Welcome to postgresql-simple-migrations, a tool for helping you with
 PostgreSQL schema migrations.
 
 This project is an open-source database migration tool. It favors simplicity
 over configuration.
 
 It is implemented in Haskell and uses the (excellent) postgresql-simple
-library to communicate with PostgreSQL. 
+library to communicate with PostgreSQL.
 
 It comes in two flavors: a library that features an easy to use Haskell
 API and as a standalone application.
 
-Database migrations can be written in SQL (in this case PostgreSQL-sql) 
+Database migrations can be written in SQL (in this case PostgreSQL-sql)
 or in Haskell.
 
 ## Why?
@@ -25,8 +25,8 @@ and documented in both your production systems and in your project files.
 This library executes SQL/Haskell migration scripts and keeps track of their
 meta information.
 
-Scripts are be executed exactly once and any changes to scripts will cause 
-a run-time error notifying you of a corrupted database. 
+Scripts are be executed exactly once and any changes to scripts will cause
+a run-time error notifying you of a corrupted database.
 
 The meta information consists of:
 * an MD5 checksum of the executed script to make sure already existing
@@ -43,11 +43,13 @@ The standalone program supports file-based migrations. To execute all SQL-files
 in a directory $BASE\_DIR, execute the following command to initialize the database
 in a first step.
 
-    CON="host=$host dbname=$db user=$user password=$pw"
-    ./dist/build/migrate/migrate init $CON
-    ./dist/build/migrate/migrate migrate $CON $BASE_DIR
+```bash
+CON="host=$host dbname=$db user=$user password=$pw"
+./dist/build/migrate/migrate init $CON
+./dist/build/migrate/migrate migrate $CON $BASE_DIR
+```
 
-For more information about the PostgreSQL connection string, see: 
+For more information about the PostgreSQL connection string, see:
 [libpq-connect](http://www.postgresql.org/docs/9.3/static/libpq-connect.html).
 
 ### Library
@@ -55,41 +57,51 @@ The library supports more actions than the standalone program.
 
 Initializing the database:
 
-    main :: IO ()
-    main = do
-        let url = "host=$host dbname=$db user=$user password=$pw"
-        con <- connectPostgreSQL (BS8.pack url)
-        void $ runMigration $ MigrationContext MigrationInitialization True con
+```haskell
+main :: IO ()
+main = do
+    let url = "host=$host dbname=$db user=$user password=$pw"
+    con <- connectPostgreSQL (BS8.pack url)
+    void $ runMigration $ MigrationContext MigrationInitialization True con
+```
 
 For file-based migrations, the following snippet can be used:
 
-    main :: IO ()
-    main = do
-        let url = "host=$host dbname=$db user=$user password=$pw"
-        let dir = "."
-        con <- connectPostgreSQL (BS8.pack url)
-        void $ runMigration $ MigrationContext (MigrationDirectory dir) True con
+```haskell
+main :: IO ()
+main = do
+    let url = "host=$host dbname=$db user=$user password=$pw"
+    let dir = "."
+    con <- connectPostgreSQL (BS8.pack url)
+    void $ runMigration $ MigrationContext (MigrationDirectory dir) True con
+```
 
 To run Haskell-based migrations, use this:
 
-    main :: IO ()
-    main = do
-        let url = "host=$host dbname=$db user=$user password=$pw"
-        let name = "my script"
-        let script = "create table users (email varchar not null)";
-        con <- connectPostgreSQL (BS8.pack url)
-        void $ runMigration $ MigrationContext (MigrationScript name script) True con
+```haskell
+main :: IO ()
+main = do
+    let url = "host=$host dbname=$db user=$user password=$pw"
+    let name = "my script"
+    let script = "create table users (email varchar not null)";
+    con <- connectPostgreSQL (BS8.pack url)
+    void $ runMigration $ MigrationContext (MigrationScript name script) True con
+```
 
 ## Compilation and Tests
 The program is built with the _cabal_ build system. The following command
 builds the library, the standalone binary and the test package.
 
-    cabal configure --enable-tests && cabal build -j
+```bash
+cabal configure --enable-tests && cabal build -j
+```
 
-To execute the tests, you need a running PostgreSQL server with an empty 
+To execute the tests, you need a running PostgreSQL server with an empty
 database called _test_. Tests are executed through cabal as follows:
 
-    cabal configure --enable-tests && cabal test
+```bash
+cabal configure --enable-tests && cabal test
+```
 
 ## To Do
 * Collect executed scripts and check if already executed scripts have been
