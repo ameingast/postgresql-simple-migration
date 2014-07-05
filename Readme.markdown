@@ -34,13 +34,62 @@ The meta information consists of:
 * a time-stamp of the date of execution so you can easily track when a change
   happened.
 
-## Usage
+## How?
 This utility can be used in two ways: embedded in your Haskell program or as
 a standalone binary.
 
-### Standalone Program
+### Standalone
+The standalone program supports file-based migrations. To execute all SQL-files
+in a directory $BASE\_DIR, execute the following command to initialize the database
+in a first step.
 
-### Haskell Library
+    CON="host=$host dbname=$db user=$user password=$pw"
+    ./dist/build/migrate/migrate init $CON
+    ./dist/build/migrate/migrate migrate $CON $BASE_DIR
+
+For more information about the PostgreSQL connection string, see: 
+[libpq-connect](http://www.postgresql.org/docs/9.3/static/libpq-connect.html).
+
+### Library
+The library supports more actions than the standalone program.
+
+Initializing the database:
+
+    main :: IO ()
+    main = do
+        let url = "host=$host dbname=$db user=$user password=$pw"
+        con <- connectPostgreSQL (BS8.pack url)
+        void $ runMigration $ MigrationContext MigrationInitialization True con
+
+For file-based migrations, the following snippet can be used:
+
+    main :: IO ()
+    main = do
+        let url = "host=$host dbname=$db user=$user password=$pw"
+        let dir = "."
+        con <- connectPostgreSQL (BS8.pack url)
+        void $ runMigration $ MigrationContext (MigrationDirectory dir) True con
+
+To run Haskell-based migrations, use this:
+
+    main :: IO ()
+    main = do
+        let url = "host=$host dbname=$db user=$user password=$pw"
+        let name = "my script"
+        let script = "create table users (email varchar not null)";
+        con <- connectPostgreSQL (BS8.pack url)
+        void $ runMigration $ MigrationContext (MigrationScript name script) True con
+
+## Compilation and Tests
+The program is built with the _cabal_ build system. The following command
+builds the library, the standalone binary and the test package.
+
+    cabal configure --enable-tests && cabal build -j
+
+To execute the tests, you need a running PostgreSQL server with an empty 
+database called _test_. Tests are executed through cabal as follows:
+
+    cabal configure --enable-tests && cabal test
 
 ## To Do
 * Collect executed scripts and check if already executed scripts have been
