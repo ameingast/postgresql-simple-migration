@@ -10,23 +10,40 @@
 -- Migration library for postgresql-simple.
 
 module Database.PostgreSQL.Simple.Migration
-    ( runMigration
+    (
+    -- * Migration actions
+    runMigration
+
+    -- * Migration types
     , MigrationContext(..)
     , MigrationCommand(..)
     , MigrationResult(..)
     , ScriptName
+    , Checksum
+
+    -- * Migration result actions
+    , getMigrations
+
+    -- * Migration result types
+    , SchemaMigration(..)
     ) where
 
-import           Control.Monad                    (liftM, void, when)
-import qualified Crypto.Hash.MD5                  as MD5 (hash)
-import qualified Data.ByteString                  as BS (ByteString, readFile)
-import qualified Data.ByteString.Base64           as B64 (encode)
-import           Data.List                        (isPrefixOf, sort)
-import           Data.Monoid                      (mconcat)
-import           Database.PostgreSQL.Simple       (Connection, Only (..),
-                                                   execute, execute_, query)
-import           Database.PostgreSQL.Simple.Types (Query (..))
-import           System.Directory                 (getDirectoryContents)
+import           Control.Applicative                ((<$>), (<*>))
+import           Control.Monad                      (liftM, void, when)
+import qualified Crypto.Hash.MD5                    as MD5 (hash)
+import qualified Data.ByteString                    as BS (ByteString, readFile)
+import qualified Data.ByteString.Base64             as B64 (encode)
+import           Data.List                          (isPrefixOf, sort)
+import           Data.Monoid                        (mconcat)
+import           Data.Time                          (LocalTime)
+import           Database.PostgreSQL.Simple         (Connection, Only (..),
+                                                     execute, execute_, query,
+                                                     query_)
+import           Database.PostgreSQL.Simple.FromRow (FromRow (..), field)
+import           Database.PostgreSQL.Simple.ToField (ToField (..))
+import           Database.PostgreSQL.Simple.ToRow   (ToRow (..))
+import           Database.PostgreSQL.Simple.Types   (Query (..))
+import           System.Directory                   (getDirectoryContents)
 
 -- | Executes migrations inside the provided 'MigrationContext'.
 runMigration :: MigrationContext -> IO (MigrationResult String)
@@ -164,3 +181,33 @@ data MigrationContext = MigrationContext
     , migrationContextConnection :: Connection
     -- ^ The PostgreSQL connection to use for migrations.
     }
+
+-- | Produces a list of all executed 'SchemaMigration's.
+getMigrations :: Connection -> IO [SchemaMigration]
+getMigrations = flip query_ q
+    where q = mconcat
+            [ "select filename, checksum, executed_at "
+            , "from schema_migrations"
+            ]
+
+-- | A product type representing a single, executed 'SchemaMigration'.
+data SchemaMigration = SchemaMigration
+    { schemaMigrationName       :: BS.ByteString
+    -- ^ The name of the executed migration.
+    , schemaMigrationChecksum   :: Checksum
+    -- ^ The calculated MD5 checksum of the executed script.
+    , schemaMigrationExecutedAt :: LocalTime
+    -- ^ A timestamp without timezone of the date of execution of the script.
+    } deriving (Show, Eq, Read)
+
+instance Ord SchemaMigration where
+    compare (SchemaMigration nameLeft _ _) (SchemaMigration nameRight _ _) =
+        compare nameLeft nameRight
+
+instance FromRow SchemaMigration where
+    fromRow = SchemaMigration <$>
+        field <*> field <*> field
+
+instance ToRow SchemaMigration where
+    toRow (SchemaMigration name checksum executedAt) =
+       [toField name, toField checksum, toField executedAt]

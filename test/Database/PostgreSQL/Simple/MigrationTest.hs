@@ -8,12 +8,14 @@ import           Database.PostgreSQL.Simple           (Connection, Only (..),
 import           Database.PostgreSQL.Simple.Migration (MigrationCommand (..),
                                                        MigrationContext (..),
                                                        MigrationResult (..),
+                                                       SchemaMigration (..),
+                                                       getMigrations,
                                                        runMigration)
 import           Test.Hspec                           (Spec, describe, it,
                                                        shouldBe)
 
 migrationSpec:: Connection -> Spec
-migrationSpec con = describe "runMigration" $ do
+migrationSpec con = describe "Migrations" $ do
     it "initializes a database" $ do
         r <- runMigration $
             MigrationContext MigrationInitialization False con
@@ -59,8 +61,14 @@ migrationSpec con = describe "runMigration" $ do
     it "creates the table from the executed scripts" $ do
         r <- existsTable con "t3"
         r `shouldBe` True
+
+    it "gets a list of executed migrations" $ do
+        r <- getMigrations con
+        map schemaMigrationName r `shouldBe` ["test.sql", "1.sql", "s.sql"]
+
     where
         q = "create table t1 (c1 varchar);"
+
 
 existsTable :: Connection -> String -> IO Bool
 existsTable con table =
