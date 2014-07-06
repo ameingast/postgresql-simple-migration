@@ -1,5 +1,5 @@
 name:                       postgresql-simple-migration
-version:                    0.1.1.0
+version:                    0.1.2.0
 synopsis:                   PostgreSQL Schema Migrations
 homepage:                   https://github.com/ameingast/postgresql-simple-migration
 Bug-reports:                https://github.com/ameingast/postgresql-simple-migration/issues
@@ -19,7 +19,6 @@ extra-source-files:         License
 
                             src/*.hs
                             src/Database/PostgreSQL/Simple/*.hs
-                            src/Database/PostgreSQL/Simple/Internal/*.hs
 
                             test/*.hs
                             test/Database/PostgreSQL/Simple/*.hs
@@ -33,7 +32,7 @@ source-repository head
 
 Library
     exposed-modules:        Database.PostgreSQL.Simple.Migration
-                            Database.PostgreSQL.Simple.Internal.Util
+                            Database.PostgreSQL.Simple.Util
     hs-source-dirs:         src
     ghc-options:            -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns
     default-extensions:     OverloadedStrings

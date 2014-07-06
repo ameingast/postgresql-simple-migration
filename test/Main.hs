@@ -1,3 +1,14 @@
+-- |
+-- Module      : Main
+-- Copyright   : (c) 2014 Andreas Meingast <ameingast@gmail.com>
+--
+-- License     : BSD-style
+-- Maintainer  : ameingast@gmail.com
+-- Stability   : experimental
+-- Portability : GHC
+--
+-- The test entry-point for postgresql-simple-migration.
+
 module Main
     ( main
     ) where

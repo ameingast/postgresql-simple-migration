@@ -7,7 +7,9 @@
 -- Stability   : experimental
 -- Portability : GHC
 --
--- Migration library for postgresql-simple.
+-- A migration library for postgresql-simple.
+--
+-- For usage, see Readme.markdown.
 
 module Database.PostgreSQL.Simple.Migration
     (
@@ -28,27 +30,31 @@ module Database.PostgreSQL.Simple.Migration
     , SchemaMigration(..)
     ) where
 
-import           Control.Applicative                      ((<$>), (<*>))
-import           Control.Monad                            (liftM, void, when)
-import qualified Crypto.Hash.MD5                          as MD5 (hash)
-import qualified Data.ByteString                          as BS (ByteString,
-                                                                 readFile)
-import qualified Data.ByteString.Base64                   as B64 (encode)
-import           Data.List                                (isPrefixOf, sort)
-import           Data.Monoid                              (mconcat)
-import           Data.Time                                (LocalTime)
-import           Database.PostgreSQL.Simple               (Connection,
-                                                           Only (..), execute,
-                                                           execute_, query,
-                                                           query_)
-import           Database.PostgreSQL.Simple.FromRow       (FromRow (..), field)
-import           Database.PostgreSQL.Simple.Internal.Util (existsTable)
-import           Database.PostgreSQL.Simple.ToField       (ToField (..))
-import           Database.PostgreSQL.Simple.ToRow         (ToRow (..))
-import           Database.PostgreSQL.Simple.Types         (Query (..))
-import           System.Directory                         (getDirectoryContents)
+import           Control.Applicative                ((<$>), (<*>))
+import           Control.Monad                      (liftM, void, when)
+import qualified Crypto.Hash.MD5                    as MD5 (hash)
+import qualified Data.ByteString                    as BS (ByteString, readFile)
+import qualified Data.ByteString.Base64             as B64 (encode)
+import           Data.List                          (isPrefixOf, sort)
+import           Data.Monoid                        (mconcat)
+import           Data.Time                          (LocalTime)
+import           Database.PostgreSQL.Simple         (Connection, Only (..),
+                                                     execute, execute_, query,
+                                                     query_)
+import           Database.PostgreSQL.Simple.FromRow (FromRow (..), field)
+import           Database.PostgreSQL.Simple.ToField (ToField (..))
+import           Database.PostgreSQL.Simple.ToRow   (ToRow (..))
+import           Database.PostgreSQL.Simple.Types   (Query (..))
+import           Database.PostgreSQL.Simple.Util    (existsTable)
+import           System.Directory                   (getDirectoryContents)
 
 -- | Executes migrations inside the provided 'MigrationContext'.
+-- 
+-- Returns 'MigrationSuccess' if the provided 'MigrationCommand' executes
+-- without error. If an error occurs, execution is stopped and
+-- a 'MigrationError' is returned.
+--
+-- It is recommended to wrap 'runMigration' inside a database transaction.
 runMigration :: MigrationContext -> IO (MigrationResult String)
 runMigration (MigrationContext cmd verbose con) = case cmd of
     MigrationInitialization ->
@@ -101,7 +107,7 @@ executeMigration con verbose name contents = do
             when verbose $ putStrLn $ "Fail:\t" ++ name
             return (MigrationError name)
     where
-        q = "insert into schema_migrations(filename, checksum) values(?, ?) "
+        q = "insert into schema_migrations(filename, checksum) values(?, ?)"
 
 -- | Initializes the database schema with a helper table containing
 -- meta-information about executed migrations.
@@ -208,6 +214,7 @@ data MigrationCommand
     | MigrationScript ScriptName BS.ByteString
     -- ^ Executes a migration based on the provided bytestring.
     | MigrationValidation MigrationCommand
+    -- ^ Validates the provided MigrationCommand.
     deriving (Show, Eq, Read, Ord)
 
 -- | A sum-type denoting the result of a single migration.
@@ -245,7 +252,7 @@ getMigrations :: Connection -> IO [SchemaMigration]
 getMigrations = flip query_ q
     where q = mconcat
             [ "select filename, checksum, executed_at "
-            , "from schema_migrations"
+            , "from schema_migrations order by executed_at asc"
             ]
 
 -- | A product type representing a single, executed 'SchemaMigration'.

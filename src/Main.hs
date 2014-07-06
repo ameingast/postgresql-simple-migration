@@ -1,3 +1,14 @@
+-- |
+-- Module      : Main
+-- Copyright   : (c) 2014 Andreas Meingast <ameingast@gmail.com>
+--
+-- License     : BSD-style
+-- Maintainer  : ameingast@gmail.com
+-- Stability   : experimental
+-- Portability : GHC
+--
+-- A standalone program for the postgresql-simple-migration library.
+
 module Main (
     main
     ) where
@@ -60,6 +71,9 @@ printUsage = do
     putStrLn "                  ignored. If a script was changed since the"
     putStrLn "                  time of its last execution, an error is"
     putStrLn "                  raised."
+    putStrLn "      validate <con> <directory>"
+    putStrLn "                  Validate all SQL scripts in the provided"
+    putStrLn "                  directory."
     putStrLn "      The <con> parameter is based on libpq connection string"
     putStrLn "      syntax. Detailled information is available here:"
     putStrLn "      <http://www.postgresql.org/docs/9.3/static/libpq-connect.html>"

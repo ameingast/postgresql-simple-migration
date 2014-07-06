@@ -1,5 +1,5 @@
 -- |
--- Module      : Database.PostgreSQL.Simple.Migration
+-- Module      : Database.PostgreSQL.Simple.Util
 -- Copyright   : (c) 2014 Andreas Meingast <ameingast@gmail.com>
 --
 -- License     : BSD-style
@@ -7,16 +7,16 @@
 -- Stability   : experimental
 -- Portability : GHC
 --
--- Migration library for postgresql-simple.
+-- A collection of utilites for database migrations.
 
-module Database.PostgreSQL.Simple.Internal.Util
+module Database.PostgreSQL.Simple.Util
     ( existsTable
     ) where
 
 import           Control.Monad              (liftM)
 import           Database.PostgreSQL.Simple (Connection, Only (..), query)
 
--- | Checks if the table named 'table' exists in the provided database.
+-- | Checks if the table with the given name exists in the database.
 existsTable :: Connection -> String -> IO Bool
 existsTable con table =
     liftM (not . null) (query con q (Only table) :: IO [[Int]])

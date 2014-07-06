@@ -1,16 +1,26 @@
-{-# LANGUAGE ScopedTypeVariables #-}
+-- |
+-- Module      : Database.PostgreSQL.Simple.MigrationTest
+-- Copyright   : (c) 2014 Andreas Meingast <ameingast@gmail.com>
+--
+-- License     : BSD-style
+-- Maintainer  : ameingast@gmail.com
+-- Stability   : experimental
+-- Portability : GHC
+--
+-- A collection of postgresql-simple-migration specifications.
 
 module Database.PostgreSQL.Simple.MigrationTest where
 
-import           Database.PostgreSQL.Simple               (Connection)
-import           Database.PostgreSQL.Simple.Internal.Util (existsTable)
-import           Database.PostgreSQL.Simple.Migration     (MigrationCommand (..), MigrationContext (..),
-                                                           MigrationResult (..),
-                                                           SchemaMigration (..),
-                                                           getMigrations,
-                                                           runMigration)
-import           Test.Hspec                               (Spec, describe, it,
-                                                           shouldBe)
+import           Database.PostgreSQL.Simple           (Connection)
+import           Database.PostgreSQL.Simple.Migration (MigrationCommand (..),
+                                                       MigrationContext (..),
+                                                       MigrationResult (..),
+                                                       SchemaMigration (..),
+                                                       getMigrations,
+                                                       runMigration)
+import           Database.PostgreSQL.Simple.Util      (existsTable)
+import           Test.Hspec                           (Spec, describe, it,
+                                                       shouldBe)
 
 migrationSpec:: Connection -> Spec
 migrationSpec con = describe "Migrations" $ do
