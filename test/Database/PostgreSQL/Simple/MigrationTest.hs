@@ -2,32 +2,33 @@
 
 module Database.PostgreSQL.Simple.MigrationTest where
 
-import           Control.Monad                        (liftM)
-import           Database.PostgreSQL.Simple           (Connection, Only (..),
-                                                       query)
-import           Database.PostgreSQL.Simple.Migration (MigrationCommand (..),
-                                                       MigrationContext (..),
-                                                       MigrationResult (..),
-                                                       SchemaMigration (..),
-                                                       getMigrations,
-                                                       runMigration)
-import           Test.Hspec                           (Spec, describe, it,
-                                                       shouldBe)
+import           Database.PostgreSQL.Simple               (Connection)
+import           Database.PostgreSQL.Simple.Internal.Util (existsTable)
+import           Database.PostgreSQL.Simple.Migration     (MigrationCommand (..), MigrationContext (..),
+                                                           MigrationResult (..),
+                                                           SchemaMigration (..),
+                                                           getMigrations,
+                                                           runMigration)
+import           Test.Hspec                               (Spec, describe, it,
+                                                           shouldBe)
 
 migrationSpec:: Connection -> Spec
 migrationSpec con = describe "Migrations" $ do
+    let migrationScript = MigrationScript "test.sql" q
+    let migrationScriptAltered = MigrationScript "test.sql" ""
+    let migrationDir = MigrationDirectory "share/test/scripts"
+    let migrationFile = MigrationFile "s.sql" "share/test/script.sql"
+
     it "initializes a database" $ do
-        r <- runMigration $
-            MigrationContext MigrationInitialization False con
+        r <- runMigration $ MigrationContext MigrationInitialization False con
         r `shouldBe` MigrationSuccess
 
-    it "creates the schema_migration table" $ do
+    it "creates the schema_migrations table" $ do
         r <- existsTable con "schema_migration"
         r `shouldBe` True
 
     it "executes a migration script" $ do
-        r <- runMigration $
-            MigrationContext (MigrationScript "test.sql" q) False con
+        r <- runMigration $ MigrationContext migrationScript False con
         r `shouldBe` MigrationSuccess
 
     it "creates the table from the executed script" $ do
@@ -36,17 +37,15 @@ migrationSpec con = describe "Migrations" $ do
 
     it "skips execution of the same migration script" $ do
         r <- runMigration $
-            MigrationContext (MigrationScript "test.sql" q) False con
+            MigrationContext migrationScript False con
         r `shouldBe` MigrationSuccess
 
     it "reports an error on a different checksum for the same script" $ do
-        r <- runMigration $
-            MigrationContext (MigrationScript "test.sql" "") False con
+        r <- runMigration $ MigrationContext migrationScriptAltered False con
         r `shouldBe` MigrationError "test.sql"
 
     it "executes migration scripts inside a folder" $ do
-        r <- runMigration $
-            MigrationContext (MigrationDirectory "share/test/scripts") False con
+        r <- runMigration $ MigrationContext migrationDir False con
         r `shouldBe` MigrationSuccess
 
     it "creates the table from the executed scripts" $ do
@@ -54,13 +53,32 @@ migrationSpec con = describe "Migrations" $ do
         r `shouldBe` True
 
     it "executes a file based migration script" $ do
-        r <- runMigration $
-            MigrationContext (MigrationFile "s.sql" "share/test/script.sql") False con
+        r <- runMigration $ MigrationContext migrationFile False con
         r `shouldBe` MigrationSuccess
 
     it "creates the table from the executed scripts" $ do
         r <- existsTable con "t3"
         r `shouldBe` True
+
+    it "validates initialization" $ do
+        r <- runMigration $ MigrationContext
+            (MigrationValidation MigrationInitialization) False con
+        r `shouldBe` MigrationSuccess
+
+    it "validates an executed migration script" $ do
+        r <- runMigration $ MigrationContext
+            (MigrationValidation migrationScript) False con
+        r `shouldBe` MigrationSuccess
+
+    it "validates all scripts inside a folder" $ do
+        r <- runMigration $ MigrationContext
+            (MigrationValidation migrationDir) False con
+        r `shouldBe` MigrationSuccess
+
+    it "validates an executed migration file" $ do
+        r <- runMigration $ MigrationContext
+            (MigrationValidation migrationFile) False con
+        r `shouldBe` MigrationSuccess
 
     it "gets a list of executed migrations" $ do
         r <- getMigrations con
@@ -69,9 +87,3 @@ migrationSpec con = describe "Migrations" $ do
     where
         q = "create table t1 (c1 varchar);"
 
-
-existsTable :: Connection -> String -> IO Bool
-existsTable con table =
-    liftM (not . null) (query con q (Only table) :: IO [[Int]])
-    where
-        q = "select count(relname) from pg_class where relname = ?"

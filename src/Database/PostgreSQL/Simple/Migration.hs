@@ -28,22 +28,25 @@ module Database.PostgreSQL.Simple.Migration
     , SchemaMigration(..)
     ) where
 
-import           Control.Applicative                ((<$>), (<*>))
-import           Control.Monad                      (liftM, void, when)
-import qualified Crypto.Hash.MD5                    as MD5 (hash)
-import qualified Data.ByteString                    as BS (ByteString, readFile)
-import qualified Data.ByteString.Base64             as B64 (encode)
-import           Data.List                          (isPrefixOf, sort)
-import           Data.Monoid                        (mconcat)
-import           Data.Time                          (LocalTime)
-import           Database.PostgreSQL.Simple         (Connection, Only (..),
-                                                     execute, execute_, query,
-                                                     query_)
-import           Database.PostgreSQL.Simple.FromRow (FromRow (..), field)
-import           Database.PostgreSQL.Simple.ToField (ToField (..))
-import           Database.PostgreSQL.Simple.ToRow   (ToRow (..))
-import           Database.PostgreSQL.Simple.Types   (Query (..))
-import           System.Directory                   (getDirectoryContents)
+import           Control.Applicative                      ((<$>), (<*>))
+import           Control.Monad                            (liftM, void, when)
+import qualified Crypto.Hash.MD5                          as MD5 (hash)
+import qualified Data.ByteString                          as BS (ByteString,
+                                                                 readFile)
+import qualified Data.ByteString.Base64                   as B64 (encode)
+import           Data.List                                (isPrefixOf, sort)
+import           Data.Monoid                              (mconcat)
+import           Data.Time                                (LocalTime)
+import           Database.PostgreSQL.Simple               (Connection,
+                                                           Only (..), execute,
+                                                           execute_, query,
+                                                           query_)
+import           Database.PostgreSQL.Simple.FromRow       (FromRow (..), field)
+import           Database.PostgreSQL.Simple.Internal.Util (existsTable)
+import           Database.PostgreSQL.Simple.ToField       (ToField (..))
+import           Database.PostgreSQL.Simple.ToRow         (ToRow (..))
+import           Database.PostgreSQL.Simple.Types         (Query (..))
+import           System.Directory                         (getDirectoryContents)
 
 -- | Executes migrations inside the provided 'MigrationContext'.
 runMigration :: MigrationContext -> IO (MigrationResult String)
@@ -56,12 +59,14 @@ runMigration (MigrationContext cmd verbose con) = case cmd of
         executeMigration con verbose name contents
     MigrationFile name path ->
         executeMigration con verbose name =<< BS.readFile path
+    MigrationValidation validationCmd ->
+        executeValidation con verbose validationCmd
 
--- | Executes all SQL-file based migrations located in the provided 'dir'.
+-- | Executes all SQL-file based migrations located in the provided 'dir'
+-- in alphabetical order.
 executeDirectoryMigration :: Connection -> Bool -> FilePath -> IO (MigrationResult String)
 executeDirectoryMigration con verbose dir =
-    liftM (filter (\x -> not $ "." `isPrefixOf` x))
-        (getDirectoryContents dir) >>= go . sort
+    scriptsInDirectory dir >>= go
     where
         go [] = return MigrationSuccess
         go (f:fs) = do
@@ -71,6 +76,12 @@ executeDirectoryMigration con verbose dir =
                     return r
                 MigrationSuccess ->
                     go fs
+
+-- | Lists all files in the given 'FilePath' 'dir' in alphabetical order.
+scriptsInDirectory :: FilePath -> IO [String]
+scriptsInDirectory dir =
+    liftM (sort . filter (\x -> not $ "." `isPrefixOf` x))
+        (getDirectoryContents dir)
 
 -- | Executes a generic SQL migration for the provided script 'name' with
 -- content 'contents'.
@@ -104,6 +115,52 @@ initializeSchema con verbose = do
         , ", executed_at timestamp without time zone not null default now() "
         , ");"
         ]
+
+-- | Validates a 'MigrationCommand'. Validation is defined as follows for these
+-- types:
+--
+-- * 'MigrationInitialization': validate the presence of the meta-information
+-- table.
+-- * 'MigrationDirectory': validate the presence and checksum of all scripts
+-- found in the given directory.
+-- * 'MigrationScript': validate the presence and checksum of the given script.
+-- * 'MigrationFile': validate the presence and checksum of the given file.
+-- * 'MigrationValidation': always succeeds.
+executeValidation :: Connection -> Bool -> MigrationCommand -> IO (MigrationResult String)
+executeValidation con verbose cmd = case cmd of
+    MigrationInitialization ->
+        existsTable con "schema_migrations" >>= \r -> return $ if r
+            then MigrationSuccess
+            else MigrationError "No such table: schema_migrations"
+    MigrationDirectory path ->
+        scriptsInDirectory path >>= goScripts path
+    MigrationScript name contents ->
+        validate name contents
+    MigrationFile name path ->
+        validate name =<< BS.readFile path
+    MigrationValidation _ ->
+        return MigrationSuccess
+    where
+        validate name contents =
+            checkScript con name (md5Hash contents) >>= \r -> case r of
+                ScriptOk -> do
+                    when verbose $ putStrLn $ "Ok:\t" ++ name
+                    return MigrationSuccess
+                ScriptNotExecuted -> do
+                    when verbose $ putStrLn $ "Missing:\t" ++ name
+                    return (MigrationError $ "Missing: " ++ name)
+                ScriptModified _ -> do
+                    when verbose $ putStrLn $ "Checksum mismatch:\t" ++ name
+                    return (MigrationError $ "Checksum mismatch: " ++ name)
+
+        goScripts _ [] = return MigrationSuccess
+        goScripts path (x:xs) = do
+            r <- validate x =<< BS.readFile (path ++ "/" ++ x)
+            case r of
+                e@(MigrationError _) ->
+                    return e
+                MigrationSuccess ->
+                    goScripts path xs
 
 -- | Checks the status of the script with the given name 'name'.
 -- If the script has already been executed, the checksum of the script
@@ -150,6 +207,7 @@ data MigrationCommand
     -- 'FilePath'.
     | MigrationScript ScriptName BS.ByteString
     -- ^ Executes a migration based on the provided bytestring.
+    | MigrationValidation MigrationCommand
     deriving (Show, Eq, Read, Ord)
 
 -- | A sum-type denoting the result of a single migration.

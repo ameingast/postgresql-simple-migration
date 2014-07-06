@@ -26,14 +26,21 @@ run (Just cmd) verbose =
     void $ case cmd of
         Initialize url -> do
             con <- connectPostgreSQL (BS8.pack url)
-            runMigration $ MigrationContext MigrationInitialization verbose con
+            runMigration $ MigrationContext
+                MigrationInitialization verbose con
         Migrate url dir -> do
             con <- connectPostgreSQL (BS8.pack url)
-            runMigration $ MigrationContext (MigrationDirectory dir) verbose con
+            runMigration $ MigrationContext
+                (MigrationDirectory dir) verbose con
+        Validate url dir -> do
+            con <- connectPostgreSQL (BS8.pack url)
+            runMigration $ MigrationContext
+                (MigrationValidation (MigrationDirectory dir)) verbose con
 
 parseCommand :: [String] -> Maybe Command
 parseCommand ("init":url:_) = Just (Initialize url)
 parseCommand ("migrate":url:dir:_) = Just (Migrate url dir)
+parseCommand ("validate":url:dir:_) = Just (Validate url dir)
 parseCommand _ = Nothing
 
 printUsage :: IO ()
@@ -59,5 +66,6 @@ printUsage = do
 
 data Command
     = Initialize String
-    | Migrate String String
+    | Migrate String FilePath
+    | Validate String FilePath
     deriving (Show, Eq, Read, Ord)

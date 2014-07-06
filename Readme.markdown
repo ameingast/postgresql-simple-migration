@@ -34,6 +34,9 @@ The meta information consists of:
 * a time-stamp of the date of execution so you can easily track when a change
   happened.
 
+This library also supports migration validation so you can ensure (some)
+correctness before your application logic kicks in.
+
 ## How?
 This utility can be used in two ways: embedded in your Haskell program or as
 a standalone binary.
@@ -47,6 +50,13 @@ in a first step.
 CON="host=$host dbname=$db user=$user password=$pw"
 ./dist/build/migrate/migrate init $CON
 ./dist/build/migrate/migrate migrate $CON $BASE_DIR
+```
+
+To validate already executed scripts, execute the following:
+```bash
+CON="host=$host dbname=$db user=$user password=$pw"
+./dist/build/migrate/migrate init $CON
+./dist/build/migrate/migrate validate $CON $BASE_DIR
 ```
 
 For more information about the PostgreSQL connection string, see:
@@ -85,7 +95,25 @@ main = do
     let name = "my script"
     let script = "create table users (email varchar not null)";
     con <- connectPostgreSQL (BS8.pack url)
-    void $ runMigration $ MigrationContext (MigrationScript name script) True con
+    void $ runMigration $ MigrationContext 
+        (MigrationScript name script) True con
+```
+
+Validations wrap _MigrationCommands_. This means that you can re-use all
+MigrationCommands to perform a read-only validation of your migrations.
+
+To perform a validation on a directory-based migration, you can use the
+following code:
+
+```haskell
+main :: IO ()
+main = do
+    let url = "host=$host dbname=$db user=$user password=$pw"
+    let name = "my script"
+    let script = "create table users (email varchar not null)";
+    con <- connectPostgreSQL (BS8.pack url)
+    void $ runMigration $ MigrationContext 
+        (MigrationValidation (MigrationDirectory dir)) verbose con
 ```
 
 ## Compilation and Tests
@@ -106,4 +134,3 @@ cabal configure --enable-tests && cabal test
 ## To Do
 * Collect executed scripts and check if already executed scripts have been
   deleted.
-* Validate command for the standalone program.

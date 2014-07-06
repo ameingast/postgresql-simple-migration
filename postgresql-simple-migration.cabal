@@ -15,9 +15,11 @@ description:                A PostgreSQL-simple schema migration utility
 
 extra-source-files:         License
                             Readme.markdown
+                            Changelog.markdown
 
                             src/*.hs
                             src/Database/PostgreSQL/Simple/*.hs
+                            src/Database/PostgreSQL/Simple/Internal/*.hs
 
                             test/*.hs
                             test/Database/PostgreSQL/Simple/*.hs
@@ -31,6 +33,7 @@ source-repository head
 
 Library
     exposed-modules:        Database.PostgreSQL.Simple.Migration
+                            Database.PostgreSQL.Simple.Internal.Util
     hs-source-dirs:         src
     ghc-options:            -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns
     default-extensions:     OverloadedStrings
