@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.2.0
+* Moved Util module
+* Improved documentation
+
 ## 0.1.1.0
 * Support for schema validations.
 * Improved Haskell API
