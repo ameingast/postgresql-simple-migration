@@ -109,8 +109,6 @@ following code:
 main :: IO ()
 main = do
     let url = "host=$host dbname=$db user=$user password=$pw"
-    let name = "my script"
-    let script = "create table users (email varchar not null)";
     con <- connectPostgreSQL (BS8.pack url)
     void $ runMigration $ MigrationContext 
         (MigrationValidation (MigrationDirectory dir)) verbose con
