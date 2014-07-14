@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.3.0
+* Better transaction handling
+* Improved documentation
+
 ## 0.1.2.0
 * Moved Util module
 * Improved documentation
