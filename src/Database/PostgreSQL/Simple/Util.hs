@@ -11,10 +11,13 @@
 
 module Database.PostgreSQL.Simple.Util
     ( existsTable
+    , withTransactionRolledBack
     ) where
 
+import           Control.Exception          (finally)
 import           Control.Monad              (liftM)
-import           Database.PostgreSQL.Simple (Connection, Only (..), query)
+import           Database.PostgreSQL.Simple (Connection, Only (..), begin,
+                                             query, rollback)
 
 -- | Checks if the table with the given name exists in the database.
 existsTable :: Connection -> String -> IO Bool
@@ -22,3 +25,9 @@ existsTable con table =
     liftM (not . null) (query con q (Only table) :: IO [[Int]])
     where
         q = "select count(relname) from pg_class where relname = ?"
+
+-- | Executes the given IO monad inside a transaction and performs a roll-back
+-- afterwards (even if exceptions occur).
+withTransactionRolledBack :: Connection -> IO a -> IO a
+withTransactionRolledBack con f =
+    begin con >> finally f (rollback con)

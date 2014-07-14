@@ -49,7 +49,7 @@ import           Database.PostgreSQL.Simple.Util    (existsTable)
 import           System.Directory                   (getDirectoryContents)
 
 -- | Executes migrations inside the provided 'MigrationContext'.
--- 
+--
 -- Returns 'MigrationSuccess' if the provided 'MigrationCommand' executes
 -- without error. If an error occurs, execution is stopped and
 -- a 'MigrationError' is returned.

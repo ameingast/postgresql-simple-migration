@@ -72,7 +72,8 @@ main :: IO ()
 main = do
     let url = "host=$host dbname=$db user=$user password=$pw"
     con <- connectPostgreSQL (BS8.pack url)
-    void $ runMigration $ MigrationContext MigrationInitialization True con
+    withTransaction con $ runMigration $ 
+        MigrationContext MigrationInitialization True con
 ```
 
 For file-based migrations, the following snippet can be used:
@@ -83,7 +84,8 @@ main = do
     let url = "host=$host dbname=$db user=$user password=$pw"
     let dir = "."
     con <- connectPostgreSQL (BS8.pack url)
-    void $ runMigration $ MigrationContext (MigrationDirectory dir) True con
+    withTransaction con $ runMigration $ 
+        MigrationContext (MigrationDirectory dir) True con
 ```
 
 To run Haskell-based migrations, use this:
@@ -95,8 +97,8 @@ main = do
     let name = "my script"
     let script = "create table users (email varchar not null)";
     con <- connectPostgreSQL (BS8.pack url)
-    void $ runMigration $ MigrationContext 
-        (MigrationScript name script) True con
+    withTransaction con $ runMigration $ 
+        MigrationContext (MigrationScript name script) True con
 ```
 
 Validations wrap _MigrationCommands_. This means that you can re-use all
@@ -110,9 +112,20 @@ main :: IO ()
 main = do
     let url = "host=$host dbname=$db user=$user password=$pw"
     con <- connectPostgreSQL (BS8.pack url)
-    void $ runMigration $ MigrationContext 
-        (MigrationValidation (MigrationDirectory dir)) verbose con
+    withTransaction con $ runMigration $ MigrationContext 
+        (MigrationValidation (MigrationDirectory dir)) True con
 ```
+
+Database migrations should always be performed in a transactional context. 
+
+The standalone binary takes care of proper transaction handling automatically.
+
+The library does not make any assumptions about the current transactional state
+of the system. This way you can execute multiple migration-commands or
+validations in sequence while still staying in the same transaction.
+
+The tests work in a similar way. After executing all migration-tests, the 
+transaction is rolled back.
 
 ## Compilation and Tests
 The program is built with the _cabal_ build system. The following command

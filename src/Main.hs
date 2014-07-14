@@ -15,7 +15,8 @@ module Main (
 
 import           Control.Monad                        (void)
 import qualified Data.ByteString.Char8                as BS8 (pack)
-import           Database.PostgreSQL.Simple           (connectPostgreSQL)
+import           Database.PostgreSQL.Simple           (connectPostgreSQL,
+                                                       withTransaction)
 import           Database.PostgreSQL.Simple.Migration (MigrationCommand (..),
                                                        MigrationContext (..),
                                                        runMigration)
@@ -37,15 +38,15 @@ run (Just cmd) verbose =
     void $ case cmd of
         Initialize url -> do
             con <- connectPostgreSQL (BS8.pack url)
-            runMigration $ MigrationContext
+            withTransaction con $ runMigration $ MigrationContext
                 MigrationInitialization verbose con
         Migrate url dir -> do
             con <- connectPostgreSQL (BS8.pack url)
-            runMigration $ MigrationContext
+            withTransaction con $ runMigration $ MigrationContext
                 (MigrationDirectory dir) verbose con
         Validate url dir -> do
             con <- connectPostgreSQL (BS8.pack url)
-            runMigration $ MigrationContext
+            withTransaction con $ runMigration $ MigrationContext
                 (MigrationValidation (MigrationDirectory dir)) verbose con
 
 parseCommand :: [String] -> Maybe Command
