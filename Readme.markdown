@@ -121,10 +121,12 @@ Database migrations should always be performed in a transactional context.
 The standalone binary takes care of proper transaction handling automatically.
 
 The library does not make any assumptions about the current transactional state
-of the system. This way you can execute multiple migration-commands or
-validations in sequence while still staying in the same transaction.
+of the system. This means that the caller of the library has to take care of
+opening/closing/rolling-back transactions. This way you can execute multiple 
+migration-commands or validations in sequence while still staying in the 
+transaction you opened.
 
-The tests work in a similar way. After executing all migration-tests, the 
+The tests make use of this. After executing all migration-tests, the 
 transaction is rolled back.
 
 ## Compilation and Tests
