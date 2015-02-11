@@ -13,24 +13,47 @@ module Main (
     main
     ) where
 
+import           Control.Applicative
+import           Control.Exception
 import           Control.Monad                        (void)
 import qualified Data.ByteString.Char8                as BS8 (pack)
 import           Database.PostgreSQL.Simple           (connectPostgreSQL,
-                                                       withTransaction)
+                                                       withTransaction,
+                                                       SqlError(..))
 import           Database.PostgreSQL.Simple.Migration (MigrationCommand (..),
                                                        MigrationContext (..),
                                                        runMigration)
 import           System.Environment                   (getArgs)
 import           System.Exit                          (exitFailure)
 
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
+
 main :: IO ()
 main = getArgs >>= \args -> case args of
     "-h":_ ->
         printUsage
     "-q":xs ->
-        run (parseCommand xs) False
+        ppException $ run (parseCommand xs) False
     xs ->
-        run (parseCommand xs) True
+        ppException $ run (parseCommand xs) True
+
+-- | Pretty print postgresql-simple exceptions to see whats going on
+ppException :: IO a -> IO a
+ppException a = catch a ehandler
+  where
+    ehandler e = maybe (throw e) (*> exitFailure)
+                 $ (pSqlError <$> fromException e)
+            -- <|> (pOtherError <$> fromException e)
+    bsToString = T.unpack . T.decodeUtf8
+    pSqlError e = mapM_ putStrLn
+                  [ "SqlError:"
+                  , "  sqlState: "       ++ (bsToString $ sqlState e)
+                  , "  sqlExecStatus: "  ++ (show $ sqlExecStatus e)
+                  , "  sqlErrorMsg: "    ++ (bsToString $ sqlErrorMsg e)
+                  , "  sqlErrorDetail: " ++ (bsToString $ sqlErrorDetail e)
+                  , "  sqlErrorHint: "   ++ (bsToString $ sqlErrorHint e)
+                  ]
 
 run :: Maybe Command -> Bool-> IO ()
 run Nothing  _ = printUsage >> exitFailure
