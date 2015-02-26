@@ -72,7 +72,7 @@ main :: IO ()
 main = do
     let url = "host=$host dbname=$db user=$user password=$pw"
     con <- connectPostgreSQL (BS8.pack url)
-    withTransaction con $ runMigration $ 
+    withTransaction con $ runMigration $
         MigrationContext MigrationInitialization True con
 ```
 
@@ -84,7 +84,7 @@ main = do
     let url = "host=$host dbname=$db user=$user password=$pw"
     let dir = "."
     con <- connectPostgreSQL (BS8.pack url)
-    withTransaction con $ runMigration $ 
+    withTransaction con $ runMigration $
         MigrationContext (MigrationDirectory dir) True con
 ```
 
@@ -97,7 +97,7 @@ main = do
     let name = "my script"
     let script = "create table users (email varchar not null)";
     con <- connectPostgreSQL (BS8.pack url)
-    withTransaction con $ runMigration $ 
+    withTransaction con $ runMigration $
         MigrationContext (MigrationScript name script) True con
 ```
 
@@ -112,21 +112,21 @@ main :: IO ()
 main = do
     let url = "host=$host dbname=$db user=$user password=$pw"
     con <- connectPostgreSQL (BS8.pack url)
-    withTransaction con $ runMigration $ MigrationContext 
+    withTransaction con $ runMigration $ MigrationContext
         (MigrationValidation (MigrationDirectory dir)) True con
 ```
 
-Database migrations should always be performed in a transactional context. 
+Database migrations should always be performed in a transactional context.
 
 The standalone binary takes care of proper transaction handling automatically.
 
 The library does not make any assumptions about the current transactional state
 of the system. This means that the caller of the library has to take care of
-opening/closing/rolling-back transactions. This way you can execute multiple 
-migration-commands or validations in sequence while still staying in the 
+opening/closing/rolling-back transactions. This way you can execute multiple
+migration-commands or validations in sequence while still staying in the
 transaction you opened.
 
-The tests make use of this. After executing all migration-tests, the 
+The tests make use of this. After executing all migration-tests, the
 transaction is rolled back.
 
 ## Compilation and Tests
@@ -142,6 +142,20 @@ database called _test_. Tests are executed through cabal as follows:
 
 ```bash
 cabal configure --enable-tests && cabal test
+```
+
+To build the project in a cabal sandbox, use the following code:
+
+```bash
+cabal sandbox init
+cabal install -j --only-dependencies --enable-tests --disable-documentation
+cabal configure --enable-tests
+cabal test
+```
+
+To remove the generated cabal sandbox, use:
+```bash
+cabal sandbox delete
 ```
 
 ## To Do
