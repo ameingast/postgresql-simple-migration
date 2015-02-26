@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.1.4.0
+* Improved error logging in standalone binary
+
 ## 0.1.3.0
 * Better transaction handling
 * Improved documentation
