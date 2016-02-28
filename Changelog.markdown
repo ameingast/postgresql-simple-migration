@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.1.5.0
+* Bumped dependencies
+
 ## 0.1.4.0
 * Improved error logging in standalone binary
 
