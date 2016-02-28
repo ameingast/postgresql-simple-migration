@@ -9,6 +9,9 @@
 --
 -- A collection of postgresql-simple-migration specifications.
 
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE CPP #-}
+
 module Database.PostgreSQL.Simple.MigrationTest where
 
 import           Database.PostgreSQL.Simple           (Connection)

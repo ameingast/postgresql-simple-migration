@@ -9,6 +9,9 @@
 --
 -- A standalone program for the postgresql-simple-migration library.
 
+{-# LANGUAGE CPP               #-}
+{-# LANGUAGE OverloadedStrings #-}
+
 module Main (
     main
     ) where
@@ -19,17 +22,17 @@ import           Control.Applicative
 import           Control.Exception
 import           Control.Monad                        (void)
 import qualified Data.ByteString.Char8                as BS8 (pack)
-import           Database.PostgreSQL.Simple           (connectPostgreSQL,
-                                                       withTransaction,
-                                                       SqlError(..))
+import           Database.PostgreSQL.Simple           (SqlError (..),
+                                                       connectPostgreSQL,
+                                                       withTransaction)
 import           Database.PostgreSQL.Simple.Migration (MigrationCommand (..),
                                                        MigrationContext (..),
                                                        runMigration)
 import           System.Environment                   (getArgs)
 import           System.Exit                          (exitFailure)
 
-import qualified Data.Text as T
-import qualified Data.Text.Encoding as T
+import qualified Data.Text                            as T
+import qualified Data.Text.Encoding                   as T
 
 main :: IO ()
 main = getArgs >>= \args -> case args of
@@ -45,16 +48,21 @@ ppException :: IO a -> IO a
 ppException a = catch a ehandler
   where
     ehandler e = maybe (throw e) (*> exitFailure)
-                 $ (pSqlError <$> fromException e)
+                 (pSqlError <$> fromException e)
             -- <|> (pOtherError <$> fromException e)
     bsToString = T.unpack . T.decodeUtf8
     pSqlError e = mapM_ putStrLn
                   [ "SqlError:"
-                  , "  sqlState: "       ++ (bsToString $ sqlState e)
-                  , "  sqlExecStatus: "  ++ (show $ sqlExecStatus e)
-                  , "  sqlErrorMsg: "    ++ (bsToString $ sqlErrorMsg e)
-                  , "  sqlErrorDetail: " ++ (bsToString $ sqlErrorDetail e)
-                  , "  sqlErrorHint: "   ++ (bsToString $ sqlErrorHint e)
+                  , "  sqlState: "
+                  , bsToString $ sqlState e
+                  , "  sqlExecStatus: "
+                  , show $ sqlExecStatus e
+                  , "  sqlErrorMsg: "
+                  , bsToString $ sqlErrorMsg e
+                  , "  sqlErrorDetail: "
+                  , bsToString $ sqlErrorDetail e
+                  , "  sqlErrorHint: "
+                  , bsToString $ sqlErrorHint e
                   ]
 
 run :: Maybe Command -> Bool-> IO ()

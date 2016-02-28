@@ -11,6 +11,9 @@
 --
 -- For usage, see Readme.markdown.
 
+{-# LANGUAGE CPP               #-}
+{-# LANGUAGE OverloadedStrings #-}
+
 module Database.PostgreSQL.Simple.Migration
     (
     -- * Migration actions
@@ -33,7 +36,7 @@ module Database.PostgreSQL.Simple.Migration
 #if __GLASGOW_HASKELL__ < 710
 import           Control.Applicative                ((<$>), (<*>))
 #endif
-import           Control.Monad                      (liftM, void, when)
+import           Control.Monad                      (void, when)
 import qualified Crypto.Hash.MD5                    as MD5 (hash)
 import qualified Data.ByteString                    as BS (ByteString, readFile)
 import qualified Data.ByteString.Base64             as B64 (encode)
@@ -90,7 +93,7 @@ executeDirectoryMigration con verbose dir =
 -- | Lists all files in the given 'FilePath' 'dir' in alphabetical order.
 scriptsInDirectory :: FilePath -> IO [String]
 scriptsInDirectory dir =
-    liftM (sort . filter (\x -> not $ "." `isPrefixOf` x))
+    fmap (sort . filter (\x -> not $ "." `isPrefixOf` x))
         (getDirectoryContents dir)
 
 -- | Executes a generic SQL migration for the provided script 'name' with

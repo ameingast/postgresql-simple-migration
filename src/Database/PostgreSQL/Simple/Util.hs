@@ -9,20 +9,22 @@
 --
 -- A collection of utilites for database migrations.
 
+{-# LANGUAGE CPP               #-}
+{-# LANGUAGE OverloadedStrings #-}
+
 module Database.PostgreSQL.Simple.Util
     ( existsTable
     , withTransactionRolledBack
     ) where
 
 import           Control.Exception          (finally)
-import           Control.Monad              (liftM)
 import           Database.PostgreSQL.Simple (Connection, Only (..), begin,
                                              query, rollback)
 
 -- | Checks if the table with the given name exists in the database.
 existsTable :: Connection -> String -> IO Bool
 existsTable con table =
-    liftM (not . null) (query con q (Only table) :: IO [[Int]])
+    fmap (not . null) (query con q (Only table) :: IO [[Int]])
     where
         q = "select count(relname) from pg_class where relname = ?"
 
