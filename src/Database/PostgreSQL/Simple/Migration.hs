@@ -30,13 +30,17 @@ module Database.PostgreSQL.Simple.Migration
     , SchemaMigration(..)
     ) where
 
+#if __GLASGOW_HASKELL__ < 710
 import           Control.Applicative                ((<$>), (<*>))
+#endif
 import           Control.Monad                      (liftM, void, when)
 import qualified Crypto.Hash.MD5                    as MD5 (hash)
 import qualified Data.ByteString                    as BS (ByteString, readFile)
 import qualified Data.ByteString.Base64             as B64 (encode)
 import           Data.List                          (isPrefixOf, sort)
+#if __GLASGOW_HASKELL__ < 710
 import           Data.Monoid                        (mconcat)
+#endif
 import           Data.Time                          (LocalTime)
 import           Database.PostgreSQL.Simple         (Connection, Only (..),
                                                      execute, execute_, query,
