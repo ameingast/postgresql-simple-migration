@@ -1,5 +1,5 @@
 name:                       postgresql-simple-migration
-version:                    0.1.4.0
+version:                    0.1.5.0
 synopsis:                   PostgreSQL Schema Migrations
 homepage:                   https://github.com/ameingast/postgresql-simple-migration
 Bug-reports:                https://github.com/ameingast/postgresql-simple-migration/issues
@@ -42,7 +42,7 @@ Library
                             bytestring                  >= 0.10     && < 0.11,
                             cryptohash                  >= 0.11     && < 0.12,
                             directory                   >= 1.2      && < 1.3,
-                            postgresql-simple           >= 0.5      && < 0.6,
+                            postgresql-simple           >= 0.4      && < 0.6,
                             time                        >= 1.5      && < 1.6
 
 Executable migrate
@@ -56,7 +56,7 @@ Executable migrate
                             bytestring                  >= 0.10     && < 0.11,
                             cryptohash                  >= 0.11     && < 0.12,
                             directory                   >= 1.2      && < 1.3,
-                            postgresql-simple           >= 0.5      && < 0.6,
+                            postgresql-simple           >= 0.4      && < 0.6,
                             time                        >= 1.5      && < 1.6,
                             text                        >= 1.2      && < 1.3
 
@@ -69,6 +69,6 @@ test-suite tests
     type:                   exitcode-stdio-1.0
     build-depends:          base                        >= 4.6      && < 5.0,
                             bytestring                  >= 0.10     && < 0.11,
-                            postgresql-simple           >= 0.5      && < 0.6,
+                            postgresql-simple           >= 0.4      && < 0.6,
                             hspec                       >= 2.2      && < 2.3,
                             postgresql-simple-migration >= 0.1      && < 0.2
