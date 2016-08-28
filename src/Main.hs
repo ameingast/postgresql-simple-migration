@@ -11,6 +11,7 @@
 
 {-# LANGUAGE CPP               #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE LambdaCase        #-}
 
 module Main (
     main
@@ -35,7 +36,7 @@ import qualified Data.Text                            as T
 import qualified Data.Text.Encoding                   as T
 
 main :: IO ()
-main = getArgs >>= \args -> case args of
+main = getArgs >>= \case
     "-h":_ ->
         printUsage
     "-q":xs ->

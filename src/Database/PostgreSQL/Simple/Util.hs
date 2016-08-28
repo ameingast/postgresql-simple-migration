@@ -11,6 +11,7 @@
 
 {-# LANGUAGE CPP               #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE LambdaCase        #-}
 
 module Database.PostgreSQL.Simple.Util
     ( existsTable

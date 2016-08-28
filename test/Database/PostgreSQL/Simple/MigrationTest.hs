@@ -10,7 +10,8 @@
 -- A collection of postgresql-simple-migration specifications.
 
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP               #-}
+{-# LANGUAGE LambdaCase        #-}
 
 module Database.PostgreSQL.Simple.MigrationTest where
 

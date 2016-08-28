@@ -13,6 +13,7 @@
 
 {-# LANGUAGE CPP               #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE LambdaCase        #-}
 
 module Database.PostgreSQL.Simple.Migration
     (
@@ -101,7 +102,7 @@ scriptsInDirectory dir =
 executeMigration :: Connection -> Bool -> ScriptName -> BS.ByteString -> IO (MigrationResult String)
 executeMigration con verbose name contents = do
     let checksum = md5Hash contents
-    checkScript con name checksum >>= \r -> case r of
+    checkScript con name checksum >>= \case
         ScriptOk -> do
             when verbose $ putStrLn $ "Ok:\t" ++ name
             return MigrationSuccess
@@ -155,7 +156,7 @@ executeValidation con verbose cmd = case cmd of
         return MigrationSuccess
     where
         validate name contents =
-            checkScript con name (md5Hash contents) >>= \r -> case r of
+            checkScript con name (md5Hash contents) >>= \case
                 ScriptOk -> do
                     when verbose $ putStrLn $ "Ok:\t" ++ name
                     return MigrationSuccess
@@ -168,8 +169,7 @@ executeValidation con verbose cmd = case cmd of
 
         goScripts _ [] = return MigrationSuccess
         goScripts path (x:xs) = do
-            r <- validate x =<< BS.readFile (path ++ "/" ++ x)
-            case r of
+            (validate x =<< BS.readFile (path ++ "/" ++ x)) >>= \case
                 e@(MigrationError _) ->
                     return e
                 MigrationSuccess ->
@@ -182,7 +182,7 @@ executeValidation con verbose cmd = case cmd of
 -- will be executed and its meta-information will be recorded.
 checkScript :: Connection -> ScriptName -> Checksum -> IO CheckScriptResult
 checkScript con name checksum =
-    query con q (Only name) >>= \r -> case r of
+    query con q (Only name) >>= \case
         [] ->
             return ScriptNotExecuted
         Only actualChecksum:_ | checksum == actualChecksum ->
