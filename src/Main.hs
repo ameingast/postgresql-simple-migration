@@ -50,7 +50,6 @@ ppException a = catch a ehandler
   where
     ehandler e = maybe (throw e) (*> exitFailure)
                  (pSqlError <$> fromException e)
-            -- <|> (pOtherError <$> fromException e)
     bsToString = T.unpack . T.decodeUtf8
     pSqlError e = mapM_ putStrLn
                   [ "SqlError:"
