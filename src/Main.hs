@@ -10,8 +10,8 @@
 -- A standalone program for the postgresql-simple-migration library.
 
 {-# LANGUAGE CPP               #-}
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE LambdaCase        #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Main (
     main
@@ -83,10 +83,10 @@ run (Just cmd) verbose =
                 (MigrationValidation (MigrationDirectory dir)) verbose con
 
 parseCommand :: [String] -> Maybe Command
-parseCommand ("init":url:_) = Just (Initialize url)
-parseCommand ("migrate":url:dir:_) = Just (Migrate url dir)
+parseCommand ("init":url:_)         = Just (Initialize url)
+parseCommand ("migrate":url:dir:_)  = Just (Migrate url dir)
 parseCommand ("validate":url:dir:_) = Just (Validate url dir)
-parseCommand _ = Nothing
+parseCommand _                      = Nothing
 
 printUsage :: IO ()
 printUsage = do

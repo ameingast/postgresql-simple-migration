@@ -12,8 +12,8 @@
 -- For usage, see Readme.markdown.
 
 {-# LANGUAGE CPP               #-}
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE LambdaCase        #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Database.PostgreSQL.Simple.Migration
     (
@@ -168,7 +168,7 @@ executeValidation con verbose cmd = case cmd of
                     return (MigrationError $ "Checksum mismatch: " ++ name)
 
         goScripts _ [] = return MigrationSuccess
-        goScripts path (x:xs) = do
+        goScripts path (x:xs) =
             (validate x =<< BS.readFile (path ++ "/" ++ x)) >>= \case
                 e@(MigrationError _) ->
                     return e
