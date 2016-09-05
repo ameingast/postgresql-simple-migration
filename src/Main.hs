@@ -21,16 +21,16 @@ module Main (
 import           Control.Applicative
 #endif
 import           Control.Exception
-import           Control.Monad                        (void)
 import qualified Data.ByteString.Char8                as BS8 (pack)
 import           Database.PostgreSQL.Simple           (SqlError (..),
                                                        connectPostgreSQL,
                                                        withTransaction)
 import           Database.PostgreSQL.Simple.Migration (MigrationCommand (..),
                                                        MigrationContext (..),
+                                                       MigrationResult (..),
                                                        runMigration)
 import           System.Environment                   (getArgs)
-import           System.Exit                          (exitFailure)
+import           System.Exit                          (exitFailure, exitSuccess)
 
 import qualified Data.Text                            as T
 import qualified Data.Text.Encoding                   as T
@@ -68,7 +68,7 @@ ppException a = catch a ehandler
 run :: Maybe Command -> Bool-> IO ()
 run Nothing  _ = printUsage >> exitFailure
 run (Just cmd) verbose =
-    void $ case cmd of
+    handleResult =<< case cmd of
         Initialize url -> do
             con <- connectPostgreSQL (BS8.pack url)
             withTransaction con $ runMigration $ MigrationContext
@@ -81,6 +81,9 @@ run (Just cmd) verbose =
             con <- connectPostgreSQL (BS8.pack url)
             withTransaction con $ runMigration $ MigrationContext
                 (MigrationValidation (MigrationDirectory dir)) verbose con
+    where
+        handleResult MigrationSuccess   = exitSuccess
+        handleResult (MigrationError _) = exitFailure
 
 parseCommand :: [String] -> Maybe Command
 parseCommand ("init":url:_)         = Just (Initialize url)
