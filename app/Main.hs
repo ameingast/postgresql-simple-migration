@@ -20,7 +20,7 @@ module Main (
 #if __GLASGOW_HASKELL__ < 710
 import           Control.Applicative
 #endif
-import           Control.Exception
+import           Control.Exception.Safe
 import qualified Data.ByteString.Char8                as BS8 (pack)
 import           Database.PostgreSQL.Simple           (SqlError (..),
                                                        connectPostgreSQL,

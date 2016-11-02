@@ -18,7 +18,7 @@ module Database.PostgreSQL.Simple.Util
     , withTransactionRolledBack
     ) where
 
-import           Control.Exception          (finally)
+import           Control.Exception.Safe     (finally)
 import           Database.PostgreSQL.Simple (Connection, Only (..), begin,
                                              query, rollback)
 
