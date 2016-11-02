@@ -13,15 +13,8 @@ build-type:                 Simple
 cabal-version:              >= 1.10
 description:                A PostgreSQL-simple schema migration utility
 
-extra-source-files:         License
-                            Readme.markdown
+extra-source-files:         Readme.markdown
                             Changelog.markdown
-
-                            src/*.hs
-                            src/Database/PostgreSQL/Simple/*.hs
-
-                            test/*.hs
-                            test/Database/PostgreSQL/Simple/*.hs
 
                             share/test/*.sql
                             share/test/scripts/*.sql
