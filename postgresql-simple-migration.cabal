@@ -47,11 +47,12 @@ Library
 
 Executable migrate
     main-is:                Main.hs
-    hs-source-dirs:         src
+    hs-source-dirs:         app
     ghc-options:            -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns
     default-extensions:     OverloadedStrings, CPP, LambdaCase
     default-language:       Haskell2010
-    build-depends:          base                        >= 4.6      && < 5.0,
+    build-depends:          postgresql-simple-migration,
+                            base                        >= 4.6      && < 5.0,
                             base64-bytestring           >= 1.0      && < 1.1,
                             bytestring                  >= 0.10     && < 0.11,
                             cryptohash                  >= 0.11     && < 0.12,
@@ -62,6 +63,7 @@ Executable migrate
 
 test-suite tests
     main-is:                Main.hs
+    other-modules:          Database.PostgreSQL.Simple.MigrationTest
     hs-source-dirs:         test
     ghc-options:            -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns
     default-extensions:     OverloadedStrings, CPP, LambdaCase
