@@ -12,6 +12,9 @@
 -- For usage, see Readme.markdown.
 
 {-# LANGUAGE CPP               #-}
+{-# LANGUAGE DeriveFoldable    #-}
+{-# LANGUAGE DeriveFunctor     #-}
+{-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -242,7 +245,7 @@ data MigrationResult a
     -- ^ There was an error in script migration.
     | MigrationSuccess
     -- ^ All scripts have been executed successfully.
-    deriving (Show, Eq, Read, Ord)
+    deriving (Show, Eq, Read, Ord, Functor, Foldable, Traversable)
 
 -- | The 'MigrationContext' provides an execution context for migrations.
 data MigrationContext = MigrationContext
