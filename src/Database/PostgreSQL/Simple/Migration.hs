@@ -106,11 +106,11 @@ runMigrations verbose con commands =
 -- | Run a sequence of contexts, stopping on the first failure
 sequenceMigrations :: Monad m => [m (MigrationResult e)] -> m (MigrationResult e)
 sequenceMigrations = \case
-    []   -> pure MigrationSuccess
+    []   -> return MigrationSuccess
     c:cs -> do
         r <- c
         case r of
-          MigrationError s -> pure (MigrationError s)
+          MigrationError s -> return (MigrationError s)
           MigrationSuccess -> sequenceMigrations cs
 
 -- | Executes all SQL-file based migrations located in the provided 'dir'
