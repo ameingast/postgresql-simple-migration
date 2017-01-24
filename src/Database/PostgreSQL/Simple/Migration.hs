@@ -119,14 +119,8 @@ executeDirectoryMigration :: Connection -> Bool -> FilePath -> IO (MigrationResu
 executeDirectoryMigration con verbose dir =
     scriptsInDirectory dir >>= go
     where
-        go [] = return MigrationSuccess
-        go (f:fs) = do
-            r <- executeMigration con verbose f =<< BS.readFile (dir ++ "/" ++ f)
-            case r of
-                MigrationError _ ->
-                    return r
-                MigrationSuccess ->
-                    go fs
+        go fs = sequenceMigrations (executeMigrationFile <$> fs)
+        executeMigrationFile f = executeMigration con verbose f =<< BS.readFile (dir ++ "/" ++ f)
 
 -- | Lists all files in the given 'FilePath' 'dir' in alphabetical order.
 scriptsInDirectory :: FilePath -> IO [String]
@@ -207,13 +201,8 @@ executeValidation con verbose cmd = case cmd of
                     when verbose $ putStrLn $ "Checksum mismatch:\t" ++ name
                     return (MigrationError $ "Checksum mismatch: " ++ name)
 
-        goScripts _ [] = return MigrationSuccess
-        goScripts path (x:xs) =
-            (validate x =<< BS.readFile (path ++ "/" ++ x)) >>= \case
-                e@(MigrationError _) ->
-                    return e
-                MigrationSuccess ->
-                    goScripts path xs
+        goScripts path xs = sequenceMigrations (goScript path <$> xs)
+        goScript path x = validate x =<< BS.readFile (path ++ "/" ++ x)
 
 -- | Checks the status of the script with the given name 'name'.
 -- If the script has already been executed, the checksum of the script
