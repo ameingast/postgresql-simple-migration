@@ -44,6 +44,8 @@ import           Control.Monad                      (void, when)
 import qualified Crypto.Hash.MD5                    as MD5 (hash)
 import qualified Data.ByteString                    as BS (ByteString, readFile)
 import qualified Data.ByteString.Base64             as B64 (encode)
+import           Data.Foldable                      (Foldable)
+import           Data.Traversable                   (Traversable)
 import           Data.List                          (isPrefixOf, sort)
 #if __GLASGOW_HASKELL__ < 710
 import           Data.Monoid                        (mconcat)
