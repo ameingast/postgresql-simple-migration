@@ -50,7 +50,7 @@ import           Data.Foldable                      (Foldable)
 import           Data.Traversable                   (Traversable)
 import           Data.List                          (isPrefixOf, sort)
 #if __GLASGOW_HASKELL__ < 710
-import           Data.Monoid                        (mconcat)
+import           Data.Monoid                        (Monoid (..))
 #endif
 import           Data.Time                          (LocalTime)
 import           Database.PostgreSQL.Simple         (Connection, Only (..),
