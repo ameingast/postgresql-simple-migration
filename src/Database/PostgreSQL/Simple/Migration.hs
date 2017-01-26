@@ -22,6 +22,8 @@ module Database.PostgreSQL.Simple.Migration
     (
     -- * Migration actions
     runMigration
+    , runMigrations
+    , sequenceMigrations
 
     -- * Migration types
     , MigrationContext(..)
@@ -48,7 +50,7 @@ import           Data.Foldable                      (Foldable)
 import           Data.Traversable                   (Traversable)
 import           Data.List                          (isPrefixOf, sort)
 #if __GLASGOW_HASKELL__ < 710
-import           Data.Monoid                        (mconcat)
+import           Data.Monoid                        (Monoid (..))
 #endif
 import           Data.Time                          (LocalTime)
 import           Database.PostgreSQL.Simple         (Connection, Only (..),
@@ -73,13 +75,43 @@ runMigration (MigrationContext cmd verbose con) = case cmd of
     MigrationInitialization ->
         initializeSchema con verbose >> return MigrationSuccess
     MigrationDirectory path ->
-       executeDirectoryMigration con verbose path
+        executeDirectoryMigration con verbose path
     MigrationScript name contents ->
         executeMigration con verbose name contents
     MigrationFile name path ->
         executeMigration con verbose name =<< BS.readFile path
     MigrationValidation validationCmd ->
         executeValidation con verbose validationCmd
+    MigrationCommands commands ->
+        runMigrations verbose con commands
+
+-- | Execute a sequence of migrations
+--
+-- Returns 'MigrationSuccess' if all of the provided 'MigrationCommand's
+-- execute without error. If an error occurs, execution is stopped and the
+-- 'MigrationError' is returned.
+--
+-- It is recommended to wrap 'runMigrations' inside a database transaction.
+runMigrations
+    :: Bool
+       -- ^ Run in verbose mode
+    -> Connection
+       -- ^ The postgres connection to use
+    -> [MigrationCommand]
+       -- ^ The commands to run
+    -> IO (MigrationResult String)
+runMigrations verbose con commands =
+    sequenceMigrations [runMigration (MigrationContext c verbose con) | c <- commands]
+
+-- | Run a sequence of contexts, stopping on the first failure
+sequenceMigrations :: Monad m => [m (MigrationResult e)] -> m (MigrationResult e)
+sequenceMigrations = \case
+    []   -> return MigrationSuccess
+    c:cs -> do
+        r <- c
+        case r of
+          MigrationError s -> return (MigrationError s)
+          MigrationSuccess -> sequenceMigrations cs
 
 -- | Executes all SQL-file based migrations located in the provided 'dir'
 -- in alphabetical order.
@@ -87,14 +119,8 @@ executeDirectoryMigration :: Connection -> Bool -> FilePath -> IO (MigrationResu
 executeDirectoryMigration con verbose dir =
     scriptsInDirectory dir >>= go
     where
-        go [] = return MigrationSuccess
-        go (f:fs) = do
-            r <- executeMigration con verbose f =<< BS.readFile (dir ++ "/" ++ f)
-            case r of
-                MigrationError _ ->
-                    return r
-                MigrationSuccess ->
-                    go fs
+        go fs = sequenceMigrations (executeMigrationFile <$> fs)
+        executeMigrationFile f = executeMigration con verbose f =<< BS.readFile (dir ++ "/" ++ f)
 
 -- | Lists all files in the given 'FilePath' 'dir' in alphabetical order.
 scriptsInDirectory :: FilePath -> IO [String]
@@ -145,6 +171,7 @@ initializeSchema con verbose = do
 -- * 'MigrationScript': validate the presence and checksum of the given script.
 -- * 'MigrationFile': validate the presence and checksum of the given file.
 -- * 'MigrationValidation': always succeeds.
+-- * 'MigrationCommands': validates all the sub-commands stopping at the first failure.
 executeValidation :: Connection -> Bool -> MigrationCommand -> IO (MigrationResult String)
 executeValidation con verbose cmd = case cmd of
     MigrationInitialization ->
@@ -159,6 +186,8 @@ executeValidation con verbose cmd = case cmd of
         validate name =<< BS.readFile path
     MigrationValidation _ ->
         return MigrationSuccess
+    MigrationCommands cs ->
+        sequenceMigrations (executeValidation con verbose <$> cs)
     where
         validate name contents =
             checkScript con name (md5Hash contents) >>= \case
@@ -172,13 +201,8 @@ executeValidation con verbose cmd = case cmd of
                     when verbose $ putStrLn $ "Checksum mismatch:\t" ++ name
                     return (MigrationError $ "Checksum mismatch: " ++ name)
 
-        goScripts _ [] = return MigrationSuccess
-        goScripts path (x:xs) =
-            (validate x =<< BS.readFile (path ++ "/" ++ x)) >>= \case
-                e@(MigrationError _) ->
-                    return e
-                MigrationSuccess ->
-                    goScripts path xs
+        goScripts path xs = sequenceMigrations (goScript path <$> xs)
+        goScript path x = validate x =<< BS.readFile (path ++ "/" ++ x)
 
 -- | Checks the status of the script with the given name 'name'.
 -- If the script has already been executed, the checksum of the script
@@ -227,7 +251,16 @@ data MigrationCommand
     -- ^ Executes a migration based on the provided bytestring.
     | MigrationValidation MigrationCommand
     -- ^ Validates the provided MigrationCommand.
+    | MigrationCommands [MigrationCommand]
+    -- ^ Performs a series of 'MigrationCommand's in sequence.
     deriving (Show, Eq, Read, Ord)
+
+instance Monoid MigrationCommand where
+    mempty = MigrationCommands []
+    mappend (MigrationCommands xs) (MigrationCommands ys) = MigrationCommands (xs ++ ys)
+    mappend (MigrationCommands xs) y = MigrationCommands (xs ++ [y])
+    mappend x (MigrationCommands ys) = MigrationCommands (x : ys)
+    mappend x y = MigrationCommands [x, y]
 
 -- | A sum-type denoting the result of a single migration.
 data CheckScriptResult
