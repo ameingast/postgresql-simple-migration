@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.8.0
+* Added MigrationCommands allowing sequencing of migrations in the Haskell API
+* Derived more datatypes for MigrationResult
+* Bumped dependencies
+
 ## 0.1.7.0
 * Propagate migration and validation result to application exit code
 
