@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.1.10.0
+* Relaxed time bounds
+
 ## 0.1.9.0
 * Bumped dependencies
 
