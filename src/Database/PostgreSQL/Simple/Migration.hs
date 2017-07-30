@@ -250,7 +250,7 @@ data MigrationCommand
     | MigrationScript ScriptName BS.ByteString
     -- ^ Executes a migration based on the provided bytestring.
     | MigrationValidation MigrationCommand
-    -- ^ Validates the provided MigrationCommand.
+    -- ^ Validates that the provided MigrationCommand has been executed.
     | MigrationCommands [MigrationCommand]
     -- ^ Performs a series of 'MigrationCommand's in sequence.
     deriving (Show, Eq, Read, Ord)
