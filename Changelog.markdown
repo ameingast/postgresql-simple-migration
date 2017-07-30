@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.1.10.1
+* Fixed hackage warnings
+
 ## 0.1.10.0
 * Relaxed time bounds
 
