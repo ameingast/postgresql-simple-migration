@@ -33,12 +33,21 @@ migrationSpec con = describe "Migrations" $ do
     let migrationDir = MigrationDirectory "share/test/scripts"
     let migrationFile = MigrationFile "s.sql" "share/test/script.sql"
 
+    it "asserts that the schema_migrations table does not exist" $ do
+        r <- existsTable con "schema_migrations"
+        r `shouldBe` False
+
+    it "validates an initialization on an empty database" $ do
+        r <- runMigration $ MigrationContext
+            (MigrationValidation MigrationInitialization) False con
+        r `shouldBe` MigrationError "No such table: schema_migrations"
+
     it "initializes a database" $ do
         r <- runMigration $ MigrationContext MigrationInitialization False con
         r `shouldBe` MigrationSuccess
 
     it "creates the schema_migrations table" $ do
-        r <- existsTable con "schema_migration"
+        r <- existsTable con "schema_migrations"
         r `shouldBe` True
 
     it "executes a migration script" $ do

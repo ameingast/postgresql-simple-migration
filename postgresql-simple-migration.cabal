@@ -1,5 +1,5 @@
 name:                       postgresql-simple-migration
-version:                    0.1.10.1
+version:                    0.1.11.0
 synopsis:                   PostgreSQL Schema Migrations
 homepage:                   https://github.com/ameingast/postgresql-simple-migration
 Bug-reports:                https://github.com/ameingast/postgresql-simple-migration/issues

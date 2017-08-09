@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.11.0
+* Improved documentation
+* Fixed exists_table
+
 ## 0.1.10.1
 * Fixed hackage warnings
 

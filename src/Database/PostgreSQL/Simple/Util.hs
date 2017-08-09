@@ -25,9 +25,13 @@ import           Database.PostgreSQL.Simple (Connection, Only (..), begin,
 -- | Checks if the table with the given name exists in the database.
 existsTable :: Connection -> String -> IO Bool
 existsTable con table =
-    fmap (not . null) (query con q (Only table) :: IO [[Int]])
+    fmap checkRowCount (query con q (Only table) :: IO [[Int]])
     where
         q = "select count(relname) from pg_class where relname = ?"
+
+        checkRowCount :: [[Int]] -> Bool
+        checkRowCount ((1:_):_) = True
+        checkRowCount _         = False
 
 -- | Executes the given IO monad inside a transaction and performs a roll-back
 -- afterwards (even if exceptions occur).
