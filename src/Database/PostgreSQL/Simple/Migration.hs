@@ -62,6 +62,7 @@ import           Database.PostgreSQL.Simple         (Connection, Only (..),
                                                      SqlError, execute,
                                                      execute_, query, query_)
 import           Database.PostgreSQL.Simple.FromRow (FromRow (..), field)
+import           Database.PostgreSQL.Simple.Parser  (toQueries)
 import           Database.PostgreSQL.Simple.ToField (ToField (..))
 import           Database.PostgreSQL.Simple.ToRow   (ToRow (..))
 import           Database.PostgreSQL.Simple.Types   (Query (..))
@@ -144,7 +145,8 @@ executeMigration con verbose name contents = do
             return MigrationSuccess
         ScriptNotExecuted -> do
             when verbose $ putStrLn $ "Execute:\t" ++ name
-            void $ execute_ con (Query contents)
+            let queries = toQueries contents
+            mapM_ (runQuery con) queries
             void $ execute con q (name, checksum)
             return MigrationSuccess
         ScriptModified _ -> do
@@ -152,6 +154,12 @@ executeMigration con verbose name contents = do
             return (MigrationError name)
     where
         q = "insert into schema_migrations(filename, checksum) values(?, ?)"
+
+runQuery :: Connection -> Query -> IO ()
+runQuery con q =
+    let ehandler e = maybe (throw e) throw
+                     (MigrationException q <$> fromException e)
+        in void $ execute_ con q `catch` ehandler
 
 -- | Initializes the database schema with a helper table containing
 -- meta-information about executed migrations.

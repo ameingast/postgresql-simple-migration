@@ -27,6 +27,7 @@ import           Database.PostgreSQL.Simple           (SqlError (..),
                                                        withTransaction)
 import           Database.PostgreSQL.Simple.Migration (MigrationCommand (..),
                                                        MigrationContext (..),
+                                                       MigrationException (..),
                                                        MigrationResult (..),
                                                        runMigration)
 import           System.Environment                   (getArgs)
@@ -49,8 +50,10 @@ ppException :: IO a -> IO a
 ppException a = catch a ehandler
   where
     ehandler e = maybe (throw e) (*> exitFailure)
-                 (pSqlError <$> fromException e)
+                 (pMigrationError <$> fromException e)
     bsToString = T.unpack . T.decodeUtf8
+    pMigrationError (MigrationException q e) = do putStrLn $ "In query " ++ show q
+                                                  pSqlError e
     pSqlError e = mapM_ putStrLn
                   [ "SqlError:"
                   , "  sqlState: "
