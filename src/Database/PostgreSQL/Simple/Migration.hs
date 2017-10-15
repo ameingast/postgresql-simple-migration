@@ -138,9 +138,9 @@ executeMigration con verbose name contents = do
             when verbose $ putStrLn $ "Ok:\t" ++ name
             return MigrationSuccess
         ScriptNotExecuted -> do
+            when verbose $ putStrLn $ "Execute:\t" ++ name
             void $ execute_ con (Query contents)
             void $ execute con q (name, checksum)
-            when verbose $ putStrLn $ "Execute:\t" ++ name
             return MigrationSuccess
         ScriptModified _ -> do
             when verbose $ putStrLn $ "Fail:\t" ++ name
