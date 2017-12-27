@@ -19,10 +19,12 @@ module Main
 
 import           Database.PostgreSQL.Simple               (connectPostgreSQL)
 import           Database.PostgreSQL.Simple.MigrationTest (migrationSpec)
+import           Database.PostgreSQL.Simple.ParserTest    (parserSpec)
 import           Database.PostgreSQL.Simple.Util          (withTransactionRolledBack)
 import           Test.Hspec                               (hspec)
 
 main :: IO ()
 main = do
+    hspec parserSpec
     con <- connectPostgreSQL "dbname=test"
     withTransactionRolledBack con (hspec (migrationSpec con))

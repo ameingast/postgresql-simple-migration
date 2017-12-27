@@ -11,12 +11,13 @@
 --
 -- For usage, see Readme.markdown.
 
-{-# LANGUAGE CPP               #-}
-{-# LANGUAGE DeriveFoldable    #-}
-{-# LANGUAGE DeriveFunctor     #-}
-{-# LANGUAGE DeriveTraversable #-}
-{-# LANGUAGE LambdaCase        #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE CPP                #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveFoldable     #-}
+{-# LANGUAGE DeriveFunctor      #-}
+{-# LANGUAGE DeriveTraversable  #-}
+{-# LANGUAGE LambdaCase         #-}
+{-# LANGUAGE OverloadedStrings  #-}
 
 module Database.PostgreSQL.Simple.Migration
     (
@@ -29,6 +30,7 @@ module Database.PostgreSQL.Simple.Migration
     , MigrationContext(..)
     , MigrationCommand(..)
     , MigrationResult(..)
+    , MigrationException(..)
     , ScriptName
     , Checksum
 
@@ -42,6 +44,8 @@ module Database.PostgreSQL.Simple.Migration
 #if __GLASGOW_HASKELL__ < 710
 import           Control.Applicative                ((<$>), (<*>))
 #endif
+import           Control.Exception                  (Exception, catch,
+                                                     fromException, throw)
 import           Control.Monad                      (void, when)
 import qualified Crypto.Hash.MD5                    as MD5 (hash)
 import qualified Data.ByteString                    as BS (ByteString, readFile)
@@ -53,10 +57,12 @@ import           Data.Traversable                   (Traversable)
 import           Data.Monoid                        (Monoid (..))
 #endif
 import           Data.Time                          (LocalTime)
+import           Data.Typeable                      (Typeable)
 import           Database.PostgreSQL.Simple         (Connection, Only (..),
-                                                     execute, execute_, query,
-                                                     query_)
+                                                     SqlError, execute,
+                                                     execute_, query, query_)
 import           Database.PostgreSQL.Simple.FromRow (FromRow (..), field)
+import           Database.PostgreSQL.Simple.Parser  (toQueries)
 import           Database.PostgreSQL.Simple.ToField (ToField (..))
 import           Database.PostgreSQL.Simple.ToRow   (ToRow (..))
 import           Database.PostgreSQL.Simple.Types   (Query (..))
@@ -138,15 +144,22 @@ executeMigration con verbose name contents = do
             when verbose $ putStrLn $ "Ok:\t" ++ name
             return MigrationSuccess
         ScriptNotExecuted -> do
-            void $ execute_ con (Query contents)
-            void $ execute con q (name, checksum)
             when verbose $ putStrLn $ "Execute:\t" ++ name
+            let queries = toQueries contents
+            mapM_ (runQuery con) queries
+            void $ execute con q (name, checksum)
             return MigrationSuccess
         ScriptModified _ -> do
             when verbose $ putStrLn $ "Fail:\t" ++ name
             return (MigrationError name)
     where
         q = "insert into schema_migrations(filename, checksum) values(?, ?)"
+
+runQuery :: Connection -> Query -> IO ()
+runQuery con q =
+    let ehandler e = maybe (throw e) throw
+                     (MigrationException q <$> fromException e)
+        in void $ execute_ con q `catch` ehandler
 
 -- | Initializes the database schema with a helper table containing
 -- meta-information about executed migrations.
@@ -321,3 +334,7 @@ instance FromRow SchemaMigration where
 instance ToRow SchemaMigration where
     toRow (SchemaMigration name checksum executedAt) =
        [toField name, toField checksum, toField executedAt]
+
+data MigrationException = MigrationException Query SqlError deriving (Show, Typeable)
+
+instance Exception MigrationException
