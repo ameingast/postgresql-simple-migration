@@ -22,6 +22,7 @@ import           Control.Applicative
 #endif
 import           Control.Exception
 import qualified Data.ByteString.Char8                as BS8 (pack)
+import           Data.Time
 import           Database.PostgreSQL.Simple           (SqlError (..),
                                                        connectPostgreSQL,
                                                        withTransaction)
@@ -29,8 +30,10 @@ import           Database.PostgreSQL.Simple.Migration (MigrationCommand (..),
                                                        MigrationContext (..),
                                                        MigrationResult (..),
                                                        runMigration)
+import           System.Directory                     (withCurrentDirectory)
 import           System.Environment                   (getArgs)
 import           System.Exit                          (exitFailure, exitSuccess)
+import           System.IO                            (writeFile)
 
 import qualified Data.Text                            as T
 import qualified Data.Text.Encoding                   as T
@@ -73,6 +76,13 @@ run (Just cmd) verbose =
             con <- connectPostgreSQL (BS8.pack url)
             withTransaction con $ runMigration $ MigrationContext
                 MigrationInitialization verbose con
+        Create name dir -> do
+            now <- getZonedTime
+            let filePath = (formatTime defaultTimeLocale "%Y%m%d%H%M%S" now)
+                  ++ "_" ++ name ++ ".sql"
+            putStrLn filePath
+            withCurrentDirectory dir $ writeFile filePath ""
+            pure MigrationSuccess
         Migrate url dir -> do
             con <- connectPostgreSQL (BS8.pack url)
             withTransaction con $ runMigration $ MigrationContext
@@ -87,6 +97,7 @@ run (Just cmd) verbose =
 
 parseCommand :: [String] -> Maybe Command
 parseCommand ("init":url:_)         = Just (Initialize url)
+parseCommand ("create":name:dir:_)  = Just (Create name dir)
 parseCommand ("migrate":url:dir:_)  = Just (Migrate url dir)
 parseCommand ("validate":url:dir:_) = Just (Validate url dir)
 parseCommand _                      = Nothing
@@ -101,6 +112,9 @@ printUsage = do
     putStrLn "      init <con>"
     putStrLn "                  Initialize the database. Required to be run"
     putStrLn "                  at least once."
+    putStrLn "      create <name> <directory>"
+    putStrLn "                  Create skeleton SQL script with name,"
+    putStrLn "                  prefixed by timestamp to ensure the order."
     putStrLn "      migrate <con> <directory>"
     putStrLn "                  Execute all SQL scripts in the provided"
     putStrLn "                  directory in alphabetical order."
@@ -117,6 +131,7 @@ printUsage = do
 
 data Command
     = Initialize String
+    | Create String FilePath
     | Migrate String FilePath
     | Validate String FilePath
     deriving (Show, Eq, Read, Ord)
