@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.1.12.0
+* Support for GHC 8.4
+
 ## 0.1.11.0
 * Improved documentation
 * Fixed exists_table

@@ -255,11 +255,10 @@ data MigrationCommand
     -- ^ Performs a series of 'MigrationCommand's in sequence.
     deriving (Show, Eq, Read, Ord)
 
+#if __GLASGOW_HASKELL__ >= 804
 instance Semigroup MigrationCommand where
-    (<>) (MigrationCommands xs) (MigrationCommands ys) = MigrationCommands (xs ++ ys)
-    (<>) (MigrationCommands xs) y = MigrationCommands (xs ++ [y])
-    (<>) x (MigrationCommands ys) = MigrationCommands (x : ys)
-    (<>) x y = MigrationCommands [x, y]
+    (<>) = mappend
+#endif
 
 instance Monoid MigrationCommand where
     mempty = MigrationCommands []
