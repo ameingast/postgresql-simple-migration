@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.1.13.0
+* Bumped dependencies
+
 ## 0.1.12.0
 * Support for GHC 8.4
 
