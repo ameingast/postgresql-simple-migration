@@ -327,7 +327,7 @@ data SchemaMigration = SchemaMigration
     , schemaMigrationChecksum   :: Checksum
     -- ^ The calculated MD5 checksum of the executed script.
     , schemaMigrationExecutedAt :: UTCTime
-    -- ^ A timestamp without timezone of the date of execution of the script.
+    -- ^ A timestamp with timezone of the date of execution of the script.
     } deriving (Show, Eq, Read)
 
 instance Ord SchemaMigration where
