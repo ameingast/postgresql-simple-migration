@@ -1,5 +1,19 @@
 # Changelog
 
+## (to be released)
+* Changed `schemaMigrationExecutedAt` from LocalTime to UTCTime by storing a
+  `timestamp with time zone` (instead of `timestamp without time zone`) in the
+  schema_migrations table.  Old versions of the schema_migrations table are
+  migrated automatically before running migrations or validations.
+
+  If you don't want postgresql to convert the timestamps using its time zone,
+  change the type of the `schema_migrations.executed_at` column to `timestamp
+  with time zone` in a migration (which allows you to control how the timestamps
+  are converted) you run prior to updating postgresql-simple-migration.
+
+  If you use `getMigrations`, which returns a `SchemaMigration`, which has the
+  `schemaMigrationExecutedAt` attribute, be aware that the type changed.
+
 ## 0.1.14.0
 * Bumped dependencies
 

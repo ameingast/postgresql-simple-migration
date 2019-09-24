@@ -52,7 +52,7 @@ import           Data.Traversable                   (Traversable)
 #if __GLASGOW_HASKELL__ < 710
 import           Data.Monoid                        (Monoid (..))
 #endif
-import           Data.Time                          (LocalTime)
+import           Data.Time                          (UTCTime)
 import           Database.PostgreSQL.Simple         (Connection, Only (..),
                                                      execute, execute_, query,
                                                      query_)
@@ -60,7 +60,7 @@ import           Database.PostgreSQL.Simple.FromRow (FromRow (..), field)
 import           Database.PostgreSQL.Simple.ToField (ToField (..))
 import           Database.PostgreSQL.Simple.ToRow   (ToRow (..))
 import           Database.PostgreSQL.Simple.Types   (Query (..))
-import           Database.PostgreSQL.Simple.Util    (existsTable)
+import           Database.PostgreSQL.Simple.Util    (existsTable, getDataType)
 import           System.Directory                   (getDirectoryContents)
 
 -- | Executes migrations inside the provided 'MigrationContext'.
@@ -71,19 +71,20 @@ import           System.Directory                   (getDirectoryContents)
 --
 -- It is recommended to wrap 'runMigration' inside a database transaction.
 runMigration :: MigrationContext -> IO (MigrationResult String)
-runMigration (MigrationContext cmd verbose con) = case cmd of
-    MigrationInitialization ->
-        initializeSchema con verbose >> return MigrationSuccess
-    MigrationDirectory path ->
-        executeDirectoryMigration con verbose path
-    MigrationScript name contents ->
-        executeMigration con verbose name contents
-    MigrationFile name path ->
-        executeMigration con verbose name =<< BS.readFile path
-    MigrationValidation validationCmd ->
-        executeValidation con verbose validationCmd
-    MigrationCommands commands ->
-        runMigrations verbose con commands
+runMigration (MigrationContext cmd verbose con) =
+    migrateMeta con verbose >> case cmd of
+        MigrationInitialization ->
+            initializeSchema con verbose >> return MigrationSuccess
+        MigrationDirectory path ->
+            executeDirectoryMigration con verbose path
+        MigrationScript name contents ->
+            executeMigration con verbose name contents
+        MigrationFile name path ->
+            executeMigration con verbose name =<< BS.readFile path
+        MigrationValidation validationCmd ->
+            executeValidation con verbose validationCmd
+        MigrationCommands commands ->
+            runMigrations verbose con commands
 
 -- | Execute a sequence of migrations
 --
@@ -157,9 +158,23 @@ initializeSchema con verbose = do
         [ "create table if not exists schema_migrations "
         , "( filename varchar(512) not null"
         , ", checksum varchar(32) not null"
-        , ", executed_at timestamp without time zone not null default now() "
+        , ", executed_at timestamp with time zone not null default now() "
         , ");"
         ]
+
+-- | Migrates the helper table in case it was created by an older version of
+-- initializeSchema.
+migrateMeta :: Connection -> Bool -> IO ()
+migrateMeta con verbose = do
+    executedAtType <- getDataType con "schema_migrations" "executed_at"
+    when (executedAtType == Just "timestamp without time zone") $ do
+        when verbose $ putStrLn
+            "Migrating schema_migrations.executed_at from LocalTime to UTCTime"
+        void $ execute_ con $ mconcat
+            [ "alter table schema_migrations "
+            , "alter column executed_at "
+            , "type timestamp with time zone"
+            ]
 
 -- | Validates a 'MigrationCommand'. Validation is defined as follows for these
 -- types:
@@ -311,7 +326,7 @@ data SchemaMigration = SchemaMigration
     -- ^ The name of the executed migration.
     , schemaMigrationChecksum   :: Checksum
     -- ^ The calculated MD5 checksum of the executed script.
-    , schemaMigrationExecutedAt :: LocalTime
+    , schemaMigrationExecutedAt :: UTCTime
     -- ^ A timestamp without timezone of the date of execution of the script.
     } deriving (Show, Eq, Read)
 

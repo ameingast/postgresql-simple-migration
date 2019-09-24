@@ -15,6 +15,7 @@
 
 module Database.PostgreSQL.Simple.Util
     ( existsTable
+    , getDataType
     , withTransactionRolledBack
     ) where
 
@@ -33,6 +34,23 @@ existsTable con table =
         checkRowCount :: [[Int64]] -> Bool
         checkRowCount ((1:_):_) = True
         checkRowCount _         = False
+
+-- | Determines the data type (eg. "character varying", "timestamp without time
+-- zone") of a given column in a given table.
+getDataType
+    :: Connection
+        -- ^ The connection to run the query on
+    -> String
+        -- ^ The name of the table
+    -> String
+        -- ^ The name of the column
+    -> IO (Maybe String)
+getDataType con table column = extractResult <$> query con q (table, column)
+    where q = mconcat $ [ "select data_type from information_schema.columns "
+                        , "where table_name = ? and column_name = ?"
+                        ]
+          extractResult [[x]] = Just x
+          extractResult _ = Nothing
 
 -- | Executes the given IO monad inside a transaction and performs a roll-back
 -- afterwards (even if exceptions occur).
