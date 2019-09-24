@@ -15,16 +15,42 @@
 
 module Database.PostgreSQL.Simple.MigrationTest where
 
-import           Database.PostgreSQL.Simple           (Connection)
+import           Database.PostgreSQL.Simple           (Connection, execute_)
 import           Database.PostgreSQL.Simple.Migration (MigrationCommand (..),
                                                        MigrationContext (..),
                                                        MigrationResult (..),
                                                        SchemaMigration (..),
                                                        getMigrations,
                                                        runMigration)
-import           Database.PostgreSQL.Simple.Util      (existsTable)
+import           Database.PostgreSQL.Simple.Util      (existsTable, getDataType)
 import           Test.Hspec                           (Spec, describe, it,
                                                        shouldBe)
+metaMigrationSpec:: Connection -> Spec
+metaMigrationSpec con = describe "Meta Migrations" $ do
+    it "asserts that the schema_migrations table does not exist" $ do
+        r <- existsTable con "schema_migrations"
+        r `shouldBe` False
+
+    it "creates an old version of the schema_migrations table for testing" $ do
+        -- This is an old version of initializeSchema, notice the type of
+        -- executed_at.
+        _ <- execute_ con $ mconcat
+            [ "create table if not exists schema_migrations "
+            , "( filename varchar(512) not null"
+            , ", checksum varchar(32) not null"
+            , ", executed_at timestamp without time zone not null default now() "
+            , ");"
+            ]
+
+        r <- existsTable con "schema_migrations"
+        r `shouldBe` True
+
+    it "runs a validation, which automatically meta-migrates" $ do
+        r <- runMigration $ MigrationContext
+            (MigrationValidation MigrationInitialization) False con
+        r `shouldBe` MigrationSuccess
+        t <- getDataType con "schema_migrations" "executed_at"
+        t `shouldBe` Just "timestamp with time zone"
 
 migrationSpec:: Connection -> Spec
 migrationSpec con = describe "Migrations" $ do
