@@ -21,15 +21,16 @@ module Database.PostgreSQL.Simple.Util
 import           Control.Exception          (finally)
 import           Database.PostgreSQL.Simple (Connection, Only (..), begin,
                                              query, rollback)
+import           GHC.Int                    (Int64)
 
 -- | Checks if the table with the given name exists in the database.
 existsTable :: Connection -> String -> IO Bool
 existsTable con table =
-    fmap checkRowCount (query con q (Only table) :: IO [[Int]])
+    fmap checkRowCount (query con q (Only table) :: IO [[Int64]])
     where
         q = "select count(relname) from pg_class where relname = ?"
 
-        checkRowCount :: [[Int]] -> Bool
+        checkRowCount :: [[Int64]] -> Bool
         checkRowCount ((1:_):_) = True
         checkRowCount _         = False
 

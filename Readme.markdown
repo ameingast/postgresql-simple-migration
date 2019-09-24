@@ -19,7 +19,7 @@ or in Haskell.
 
 ## Why?
 Database migrations should not be hard. They should be under version control
-and documented in both your production systems and in your project files.
+and documented both in your production systems and in your project files.
 
 ## What?
 This library executes SQL/Haskell migration scripts and keeps track of their
