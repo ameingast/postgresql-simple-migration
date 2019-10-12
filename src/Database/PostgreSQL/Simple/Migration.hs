@@ -38,6 +38,7 @@ module Database.PostgreSQL.Simple.Migration
 
     -- * Migration result actions
     , getMigrations
+    , getMigrations'
 
     -- * Migration result types
     , SchemaMigration(..)
@@ -349,10 +350,14 @@ data MigrationContext' = MigrationContext'
     , migrationTableName :: !BS.ByteString
     -- ^ The name of the table that stores the migrations
     }
+--
+-- | Produces a list of all executed 'SchemaMigration's.
+getMigrations :: Connection -> IO [SchemaMigration]
+getMigrations con = getMigrations' con "schema_migrations"
 
 -- | Produces a list of all executed 'SchemaMigration's.
-getMigrations :: Connection -> BS.ByteString -> IO [SchemaMigration]
-getMigrations con tableName = query_ con q
+getMigrations' :: Connection -> BS.ByteString -> IO [SchemaMigration]
+getMigrations' con tableName = query_ con q
     where q = mconcat
             [ "select filename, checksum, executed_at "
             , "from " <> Query tableName <> " order by executed_at asc"
