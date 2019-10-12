@@ -177,7 +177,7 @@ executeMigration con tableName verbose name contents = do
               ++ "\n" ++ scriptModifiedErrorMessage expected actual
             return (MigrationError name)
     where
-        q = "insert into " <> Query tableName <> "(filename, checksum) values(?, ?)"
+        q = "insert into " `mappend` Query tableName `mappend` "(filename, checksum) values(?, ?)"
 
 -- | Initializes the database schema with a helper table containing
 -- meta-information about executed migrations.
@@ -185,7 +185,7 @@ initializeSchema :: Connection -> BS.ByteString -> Bool -> IO ()
 initializeSchema con tableName verbose = do
     when verbose $ putStrLn "Initializing schema"
     void $ execute_ con $ mconcat
-        [ "create table if not exists " <> Query tableName <> " "
+        [ "create table if not exists " `mappend` Query tableName `mappend` " "
         , "( filename varchar(512) not null"
         , ", checksum varchar(32) not null"
         , ", executed_at timestamp without time zone not null default now() "
@@ -210,7 +210,7 @@ executeValidation con tableName' verbose cmd =
     MigrationInitialization ->
         existsTable con tableName >>= \r -> return $ if r
             then MigrationSuccess
-            else MigrationError $ "No such table: " <> tableName
+            else MigrationError $ "No such table: " `mappend` tableName
     MigrationDirectory path ->
         scriptsInDirectory path >>= goScripts path
     MigrationScript name contents ->
@@ -258,7 +258,7 @@ checkScript con tableName name fileChecksum =
                     })
     where
         q = mconcat
-            [ "select checksum from " <> Query tableName <> " "
+            [ "select checksum from " `mappend` Query tableName `mappend` " "
             , "where filename = ? limit 1"
             ]
 
@@ -360,7 +360,7 @@ getMigrations' :: Connection -> BS.ByteString -> IO [SchemaMigration]
 getMigrations' con tableName = query_ con q
     where q = mconcat
             [ "select filename, checksum, executed_at "
-            , "from " <> Query tableName <> " order by executed_at asc"
+            , "from " `mappend` Query tableName `mappend` " order by executed_at asc"
             ]
 
 -- | A product type representing a single, executed 'SchemaMigration'.
