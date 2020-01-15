@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.1.15.0
+* Bumped dependencies
+
 ## 0.1.14.0
 * Bumped dependencies
 
