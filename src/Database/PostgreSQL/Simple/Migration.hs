@@ -17,6 +17,7 @@
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE NamedFieldPuns    #-}
 
 module Database.PostgreSQL.Simple.Migration
     (
@@ -142,8 +143,10 @@ executeMigration con verbose name contents = do
             void $ execute con q (name, checksum)
             when verbose $ putStrLn $ "Execute:\t" ++ name
             return MigrationSuccess
-        ScriptModified _ -> do
-            when verbose $ putStrLn $ "Fail:\t" ++ name
+        ScriptModified { actual, expected } -> do
+            when verbose $ putStrLn
+              $ "Fail:\t" ++ name
+              ++ "\n" ++ scriptModifiedErrorMessage expected actual
             return (MigrationError name)
     where
         q = "insert into schema_migrations(filename, checksum) values(?, ?)"
@@ -197,8 +200,10 @@ executeValidation con verbose cmd = case cmd of
                 ScriptNotExecuted -> do
                     when verbose $ putStrLn $ "Missing:\t" ++ name
                     return (MigrationError $ "Missing: " ++ name)
-                ScriptModified _ -> do
-                    when verbose $ putStrLn $ "Checksum mismatch:\t" ++ name
+                ScriptModified { expected, actual } -> do
+                    when verbose $ putStrLn
+                      $ "Checksum mismatch:\t" ++ name
+                      ++ "\n" ++ scriptModifiedErrorMessage expected actual
                     return (MigrationError $ "Checksum mismatch: " ++ name)
 
         goScripts path xs = sequenceMigrations (goScript path <$> xs)
@@ -210,14 +215,17 @@ executeValidation con verbose cmd = case cmd of
 -- If there is no matching script entry in the database, the script
 -- will be executed and its meta-information will be recorded.
 checkScript :: Connection -> ScriptName -> Checksum -> IO CheckScriptResult
-checkScript con name checksum =
+checkScript con name fileChecksum =
     query con q (Only name) >>= \case
         [] ->
             return ScriptNotExecuted
-        Only actualChecksum:_ | checksum == actualChecksum ->
+        Only dbChecksum:_ | fileChecksum == dbChecksum ->
             return ScriptOk
-        Only actualChecksum:_ ->
-            return (ScriptModified actualChecksum)
+        Only dbChecksum:_ ->
+            return (ScriptModified {
+                       expected = dbChecksum,
+                       actual = fileChecksum
+                    })
     where
         q = mconcat
             [ "select checksum from schema_migrations "
@@ -272,12 +280,16 @@ data CheckScriptResult
     = ScriptOk
     -- ^ The script has already been executed and the checksums match.
     -- This is good.
-    | ScriptModified Checksum
+    | ScriptModified { expected :: Checksum, actual :: Checksum }
     -- ^ The script has already been executed and there is a checksum
     -- mismatch. This is bad.
     | ScriptNotExecuted
     -- ^ The script has not been executed, yet. This is good.
     deriving (Show, Eq, Read, Ord)
+
+scriptModifiedErrorMessage :: Checksum -> Checksum -> [Char]
+scriptModifiedErrorMessage expected actual =
+  "expected: " ++ show expected ++ "\nhash was: " ++ show actual
 
 -- | A sum-type denoting the result of a migration.
 data MigrationResult a
