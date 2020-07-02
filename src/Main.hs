@@ -21,14 +21,15 @@ module Main (
 import           Control.Applicative
 #endif
 import           Control.Exception
+import qualified Data.ByteString                      as BS (ByteString)
 import qualified Data.ByteString.Char8                as BS8 (pack)
 import           Database.PostgreSQL.Simple           (SqlError (..),
                                                        connectPostgreSQL,
                                                        withTransaction)
 import           Database.PostgreSQL.Simple.Migration (MigrationCommand (..),
-                                                       MigrationContext (..),
+                                                       MigrationContext' (..),
                                                        MigrationResult (..),
-                                                       runMigration)
+                                                       runMigration')
 import           System.Environment                   (getArgs)
 import           System.Exit                          (exitFailure, exitSuccess)
 
@@ -69,26 +70,29 @@ run :: Maybe Command -> Bool-> IO ()
 run Nothing  _ = printUsage >> exitFailure
 run (Just cmd) verbose =
     handleResult =<< case cmd of
-        Initialize url -> do
+        Initialize url tableName -> do
             con <- connectPostgreSQL (BS8.pack url)
-            withTransaction con $ runMigration $ MigrationContext
-                MigrationInitialization verbose con
-        Migrate url dir -> do
+            withTransaction con $ runMigration' $ MigrationContext'
+                MigrationInitialization verbose con tableName
+        Migrate url dir tableName -> do
             con <- connectPostgreSQL (BS8.pack url)
-            withTransaction con $ runMigration $ MigrationContext
-                (MigrationDirectory dir) verbose con
-        Validate url dir -> do
+            withTransaction con $ runMigration' $ MigrationContext'
+                (MigrationDirectory dir) verbose con tableName
+        Validate url dir tableName -> do
             con <- connectPostgreSQL (BS8.pack url)
-            withTransaction con $ runMigration $ MigrationContext
-                (MigrationValidation (MigrationDirectory dir)) verbose con
+            withTransaction con $ runMigration' $ MigrationContext'
+                (MigrationValidation (MigrationDirectory dir)) verbose con tableName
     where
         handleResult MigrationSuccess   = exitSuccess
         handleResult (MigrationError _) = exitFailure
 
 parseCommand :: [String] -> Maybe Command
-parseCommand ("init":url:_)         = Just (Initialize url)
-parseCommand ("migrate":url:dir:_)  = Just (Migrate url dir)
-parseCommand ("validate":url:dir:_) = Just (Validate url dir)
+parseCommand ("init":url:tableName:_)         = Just (Initialize url (BS8.pack tableName))
+parseCommand ("migrate":url:dir:tableName:_)  = Just (Migrate url dir (BS8.pack tableName))
+parseCommand ("validate":url:dir:tableName:_) = Just (Validate url dir (BS8.pack tableName))
+parseCommand ("init":url:_)         = Just (Initialize url "schema_migrations")
+parseCommand ("migrate":url:dir:_)  = Just (Migrate url dir "schema_migrations")
+parseCommand ("validate":url:dir:_) = Just (Validate url dir "schema_migrations")
 parseCommand _                      = Nothing
 
 printUsage :: IO ()
@@ -98,25 +102,34 @@ printUsage = do
     putStrLn "      -h          Print help text"
     putStrLn "      -q          Enable quiet mode"
     putStrLn "  Commands:"
-    putStrLn "      init <con>"
+    putStrLn "      init <con> {migrations table name}"
     putStrLn "                  Initialize the database. Required to be run"
     putStrLn "                  at least once."
-    putStrLn "      migrate <con> <directory>"
+    putStrLn "                  {migrations table name} is the optiona name."
+    putStrLn "                  for the migrations table. This defaults to"
+    putStrLn "                  `schema_migrations`."
+    putStrLn "      migrate <con> <directory> {migrations table name}"
     putStrLn "                  Execute all SQL scripts in the provided"
     putStrLn "                  directory in alphabetical order."
     putStrLn "                  Scripts that have already been executed are"
     putStrLn "                  ignored. If a script was changed since the"
     putStrLn "                  time of its last execution, an error is"
     putStrLn "                  raised."
-    putStrLn "      validate <con> <directory>"
+    putStrLn "                  {migrations table name} is the optiona name."
+    putStrLn "                  for the migrations table. This defaults to"
+    putStrLn "                  `schema_migrations`."
+    putStrLn "      validate <con> <directory> {migrations table name}"
     putStrLn "                  Validate all SQL scripts in the provided"
     putStrLn "                  directory."
+    putStrLn "                  {migrations table name} is the optiona name."
+    putStrLn "                  for the migrations table. This defaults to"
+    putStrLn "                  `schema_migrations`."
     putStrLn "      The <con> parameter is based on libpq connection string"
     putStrLn "      syntax. Detailled information is available here:"
     putStrLn "      <http://www.postgresql.org/docs/9.3/static/libpq-connect.html>"
 
 data Command
-    = Initialize String
-    | Migrate String FilePath
-    | Validate String FilePath
+    = Initialize String BS.ByteString
+    | Migrate String FilePath BS.ByteString
+    | Validate String FilePath BS.ByteString
     deriving (Show, Eq, Read, Ord)
