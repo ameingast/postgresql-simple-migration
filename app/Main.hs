@@ -31,15 +31,17 @@ import           Database.PostgreSQL.Simple.Migration (MigrationCommand (..),
                                                        runMigration)
 import           System.Environment                   (getArgs)
 import           System.Exit                          (exitFailure, exitSuccess)
+import           System.IO                            (Handle, hPutStrLn,
+                                                       stdout, stderr)
 
 import qualified Data.Text                            as T
 import qualified Data.Text.Encoding                   as T
 
 main :: IO ()
 main = getArgs >>= \case
-    "-h":_ ->
-        printUsage
-    "-q":xs ->
+    x:_  | x `elem` ["-h", "--help"] ->
+        printUsage stdout
+    x:xs | x `elem` ["-q", "--quiet"] ->
         ppException $ run (parseCommand xs) False
     xs ->
         ppException $ run (parseCommand xs) True
@@ -51,7 +53,7 @@ ppException a = catch a ehandler
     ehandler e = maybe (throw e) (*> exitFailure)
                  (pSqlError <$> fromException e)
     bsToString = T.unpack . T.decodeUtf8
-    pSqlError e = mapM_ putStrLn
+    pSqlError e = mapM_ (hPutStrLn stderr)
                   [ "SqlError:"
                   , "  sqlState: "
                   , bsToString $ sqlState e
@@ -65,8 +67,8 @@ ppException a = catch a ehandler
                   , bsToString $ sqlErrorHint e
                   ]
 
-run :: Maybe Command -> Bool-> IO ()
-run Nothing  _ = printUsage >> exitFailure
+run :: Maybe Command -> Bool -> IO ()
+run Nothing  _ = printUsage stderr >> exitFailure
 run (Just cmd) verbose =
     handleResult =<< case cmd of
         Initialize url -> do
@@ -91,29 +93,31 @@ parseCommand ("migrate":url:dir:_)  = Just (Migrate url dir)
 parseCommand ("validate":url:dir:_) = Just (Validate url dir)
 parseCommand _                      = Nothing
 
-printUsage :: IO ()
-printUsage = do
-    putStrLn "migrate [options] <command>"
-    putStrLn "  Options:"
-    putStrLn "      -h          Print help text"
-    putStrLn "      -q          Enable quiet mode"
-    putStrLn "  Commands:"
-    putStrLn "      init <con>"
-    putStrLn "                  Initialize the database. Required to be run"
-    putStrLn "                  at least once."
-    putStrLn "      migrate <con> <directory>"
-    putStrLn "                  Execute all SQL scripts in the provided"
-    putStrLn "                  directory in alphabetical order."
-    putStrLn "                  Scripts that have already been executed are"
-    putStrLn "                  ignored. If a script was changed since the"
-    putStrLn "                  time of its last execution, an error is"
-    putStrLn "                  raised."
-    putStrLn "      validate <con> <directory>"
-    putStrLn "                  Validate all SQL scripts in the provided"
-    putStrLn "                  directory."
-    putStrLn "      The <con> parameter is based on libpq connection string"
-    putStrLn "      syntax. Detailled information is available here:"
-    putStrLn "      <http://www.postgresql.org/docs/9.3/static/libpq-connect.html>"
+printUsage :: Handle -> IO ()
+printUsage h = do
+    say "migrate [options] <command>"
+    say "  Options:"
+    say "      -h --help   Print help text"
+    say "      -q --quiet  Enable quiet mode"
+    say "  Commands:"
+    say "      init <con>"
+    say "                  Initialize the database. Required to be run"
+    say "                  at least once."
+    say "      migrate <con> <directory>"
+    say "                  Execute all SQL scripts in the provided"
+    say "                  directory in alphabetical order."
+    say "                  Scripts that have already been executed are"
+    say "                  ignored. If a script was changed since the"
+    say "                  time of its last execution, an error is"
+    say "                  raised."
+    say "      validate <con> <directory>"
+    say "                  Validate all SQL scripts in the provided"
+    say "                  directory."
+    say "      The <con> parameter is based on libpq connection string"
+    say "      syntax. Detailled information is available here:"
+    say "      <http://www.postgresql.org/docs/9.3/static/libpq-connect.html>"
+    where
+        say = hPutStrLn h
 
 data Command
     = Initialize String
