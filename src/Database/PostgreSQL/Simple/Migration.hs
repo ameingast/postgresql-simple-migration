@@ -27,6 +27,7 @@ module Database.PostgreSQL.Simple.Migration
     -- * Migration types
     , MigrationContext(..)
     , MigrationCommand(..)
+    , MigrationVerbosity(..)
     , MigrationResult(..)
     , ScriptName
     , Checksum
@@ -41,11 +42,14 @@ module Database.PostgreSQL.Simple.Migration
 #if __GLASGOW_HASKELL__ < 710
 import           Control.Applicative                ((<$>), (<*>))
 #endif
-import           Control.Monad                      (void, when)
+import           Control.Monad                      (void)
 import           Control.Monad.IO.Class             (MonadIO (liftIO))
 import qualified Crypto.Hash.MD5                    as MD5 (hash)
 import qualified Data.ByteString                    as BS (ByteString, readFile)
 import qualified Data.ByteString.Base64             as B64 (encode)
+import qualified Data.Text                          as T
+import qualified Data.Text.IO                       as T
+import           Data.String                        (fromString)
 import           Data.List                          (isPrefixOf, sort)
 #if __GLASGOW_HASKELL__ < 710
 import           Data.Monoid                        (Monoid (..))
@@ -60,6 +64,7 @@ import           Database.PostgreSQL.Simple.ToRow   (ToRow (..))
 import           Database.PostgreSQL.Simple.Types   (Query (..))
 import           Database.PostgreSQL.Simple.Util    (existsTable)
 import           System.Directory                   (getDirectoryContents)
+import           System.IO                          (stderr)
 
 -- | Executes migrations inside the provided 'MigrationContext'.
 --
@@ -68,20 +73,23 @@ import           System.Directory                   (getDirectoryContents)
 -- a 'MigrationError' is returned.
 --
 -- It is recommended to wrap 'runMigration' inside a database transaction.
-runMigration :: MonadIO m => MigrationContext -> m (MigrationResult String)
-runMigration (MigrationContext cmd verbose con) = case cmd of
+runMigration
+    :: (MonadIO m, MigrationVerbosity verbosity)
+    => MigrationContext verbosity
+    -> m (MigrationResult String)
+runMigration (MigrationContext cmd verbosity con) = case cmd of
     MigrationInitialization ->
-        initializeSchema con verbose >> return MigrationSuccess
+        initializeSchema con verbosity >> return MigrationSuccess
     MigrationDirectory path ->
-        executeDirectoryMigration con verbose path
+        executeDirectoryMigration con verbosity path
     MigrationScript name contents ->
-        executeMigration con verbose name contents
+        executeMigration con verbosity name contents
     MigrationFile name path ->
-        executeMigration con verbose name =<< liftIO (BS.readFile path)
+        executeMigration con verbosity name =<< liftIO (BS.readFile path)
     MigrationValidation validationCmd ->
-        executeValidation con verbose validationCmd
+        executeValidation con verbosity validationCmd
     MigrationCommands commands ->
-        runMigrations verbose con commands
+        runMigrations verbosity con commands
 
 -- | Execute a sequence of migrations
 --
@@ -91,17 +99,17 @@ runMigration (MigrationContext cmd verbose con) = case cmd of
 --
 -- It is recommended to wrap 'runMigrations' inside a database transaction.
 runMigrations
-    :: MonadIO m
-    => Bool
-       -- ^ Run in verbose mode
+    :: (MonadIO m, MigrationVerbosity verbosity)
+    => verbosity
+       -- ^ Verbosity control (e.g. 'Bool')
     -> Connection
        -- ^ The postgres connection to use
     -> [MigrationCommand]
        -- ^ The commands to run
     -> m (MigrationResult String)
-runMigrations verbose con commands =
+runMigrations verbosity con commands =
     sequenceMigrations
-        [runMigration (MigrationContext c verbose con) | c <- commands]
+        [runMigration (MigrationContext c verbosity con) | c <- commands]
 
 -- | Run a sequence of contexts, stopping on the first failure
 sequenceMigrations
@@ -119,17 +127,17 @@ sequenceMigrations = \case
 -- | Executes all SQL-file based migrations located in the provided 'dir'
 -- in alphabetical order.
 executeDirectoryMigration
-    :: MonadIO m
+    :: (MonadIO m, MigrationVerbosity verbosity)
     => Connection
-    -> Bool
+    -> verbosity
     -> FilePath
     -> m (MigrationResult String)
-executeDirectoryMigration con verbose dir =
+executeDirectoryMigration con verbosity dir =
     scriptsInDirectory dir >>= go
     where
         go fs = sequenceMigrations (executeMigrationFile <$> fs)
         executeMigrationFile f =
-            executeMigration con verbose f
+            executeMigration con verbosity f
                 =<< liftIO (BS.readFile $ dir ++ "/" ++ f)
 
 -- | Lists all files in the given 'FilePath' 'dir' in alphabetical order.
@@ -141,36 +149,40 @@ scriptsInDirectory dir =
 -- | Executes a generic SQL migration for the provided script 'name' with
 -- content 'contents'.
 executeMigration
-    :: MonadIO m
+    :: (MonadIO m, MigrationVerbosity verbosity)
     => Connection
-    -> Bool
+    -> verbosity
     -> ScriptName
     -> BS.ByteString
     -> m (MigrationResult String)
-executeMigration con verbose name contents = do
+executeMigration con verbosity name contents = do
     let checksum = md5Hash contents
     checkScript con name checksum >>= \case
         ScriptOk -> do
-            when verbose $ liftIO $ putStrLn $ "Ok:\t" ++ name
+            migrationLogWrite verbosity $ Right ("Ok:\t" <> fromString name)
             return MigrationSuccess
         ScriptNotExecuted -> do
             void $ liftIO $ execute_ con (Query contents)
             void $ liftIO $ execute con q (name, checksum)
-            when verbose $ liftIO $ putStrLn $ "Execute:\t" ++ name
+            migrationLogWrite verbosity $ Left ("Execute:\t" <> fromString name)
             return MigrationSuccess
         ScriptModified { actual, expected } -> do
-            when verbose $ liftIO $ putStrLn
-              $ "Fail:\t" ++ name
-              ++ "\n" ++ scriptModifiedErrorMessage expected actual
+            migrationLogWrite verbosity $ Left
+              $ "Fail:\t" <> fromString name
+              <> "\n" <> scriptModifiedErrorMessage expected actual
             return (MigrationError name)
     where
         q = "insert into schema_migrations(filename, checksum) values(?, ?)"
 
 -- | Initializes the database schema with a helper table containing
 -- meta-information about executed migrations.
-initializeSchema :: MonadIO m => Connection -> Bool -> m ()
-initializeSchema con verbose = do
-    when verbose $ liftIO $ putStrLn "Initializing schema"
+initializeSchema
+    :: (MonadIO m, MigrationVerbosity verbosity)
+    => Connection
+    -> verbosity
+    -> m ()
+initializeSchema con verbosity = do
+    migrationLogWrite verbosity $ Right "Initializing schema"
     void $ liftIO $ execute_ con $ mconcat
         [ "create table if not exists schema_migrations "
         , "( filename varchar(512) not null"
@@ -192,12 +204,12 @@ initializeSchema con verbose = do
 -- * 'MigrationCommands': validates all the sub-commands stopping at the first
 -- failure.
 executeValidation
-    :: MonadIO m
+    :: (MonadIO m, MigrationVerbosity verbosity)
     => Connection
-    -> Bool
+    -> verbosity
     -> MigrationCommand
     -> m (MigrationResult String)
-executeValidation con verbose cmd = case cmd of
+executeValidation con verbosity cmd = case cmd of
     MigrationInitialization ->
         existsTable con "schema_migrations" >>= \r -> return $ if r
             then MigrationSuccess
@@ -211,20 +223,22 @@ executeValidation con verbose cmd = case cmd of
     MigrationValidation _ ->
         return MigrationSuccess
     MigrationCommands cs ->
-        sequenceMigrations (executeValidation con verbose <$> cs)
+        sequenceMigrations (executeValidation con verbosity <$> cs)
     where
         validate name contents =
             checkScript con name (md5Hash contents) >>= \case
                 ScriptOk -> do
-                    when verbose $ liftIO $ putStrLn $ "Ok:\t" ++ name
+                    migrationLogWrite verbosity $
+                        Right ("Ok:\t" <> fromString name)
                     return MigrationSuccess
                 ScriptNotExecuted -> do
-                    when verbose $ liftIO $ putStrLn $ "Missing:\t" ++ name
+                    migrationLogWrite verbosity $
+                        Left ("Missing:\t" <> fromString name)
                     return (MigrationError $ "Missing: " ++ name)
                 ScriptModified { expected, actual } -> do
-                    when verbose $ liftIO $ putStrLn
-                      $ "Checksum mismatch:\t" ++ name
-                      ++ "\n" ++ scriptModifiedErrorMessage expected actual
+                    migrationLogWrite verbosity $ Left
+                      $ "Checksum mismatch:\t" <> fromString name
+                      <> "\n" <> scriptModifiedErrorMessage expected actual
                     return (MigrationError $ "Checksum mismatch: " ++ name)
 
         goScripts path xs = sequenceMigrations (goScript path <$> xs)
@@ -314,9 +328,10 @@ data CheckScriptResult
     -- ^ The script has not been executed, yet. This is good.
     deriving (Show, Eq, Read, Ord)
 
-scriptModifiedErrorMessage :: Checksum -> Checksum -> [Char]
+scriptModifiedErrorMessage :: Checksum -> Checksum -> T.Text
 scriptModifiedErrorMessage expected actual =
-  "expected: " ++ show expected ++ "\nhash was: " ++ show actual
+  "expected: " <> fromString (show expected) <>
+  "\nhash was: " <> fromString (show actual)
 
 -- | A sum-type denoting the result of a migration.
 data MigrationResult a
@@ -327,18 +342,19 @@ data MigrationResult a
     deriving (Show, Eq, Read, Ord, Functor, Foldable, Traversable)
 
 -- | The 'MigrationContext' provides an execution context for migrations.
-data MigrationContext = MigrationContext
+data MigrationContext verbose
+    = MigrationContext
     { migrationContextCommand    :: MigrationCommand
-    -- ^ The action that will be performed by 'runMigration'
-    , migrationContextVerbose    :: Bool
-    -- ^ Verbosity of the library.
+    -- ^ The action that will be performed by 'runMigration'.
+    , migrationContextVerbose    :: verbose
+    -- ^ Verbosity of the library (e.g. 'Bool').
     , migrationContextConnection :: Connection
     -- ^ The PostgreSQL connection to use for migrations.
     }
 
 -- | Produces a list of all executed 'SchemaMigration's.
-getMigrations :: Connection -> IO [SchemaMigration]
-getMigrations = flip query_ q
+getMigrations :: MonadIO m => Connection -> m [SchemaMigration]
+getMigrations = liftIO . flip query_ q
     where q = mconcat
             [ "select filename, checksum, executed_at "
             , "from schema_migrations order by executed_at asc"
@@ -365,3 +381,35 @@ instance FromRow SchemaMigration where
 instance ToRow SchemaMigration where
     toRow (SchemaMigration name checksum executedAt) =
        [toField name, toField checksum, toField executedAt]
+
+-- | An abstract interface for handling logging.
+--
+-- If you need to use a logging framework consider this example:
+--
+-- @
+-- data MyLogger = MyLogger Handle
+--
+-- instance MigrationVerbosity MyLogger where
+--   migrationLogWrite (MyLogger h) = liftIO $ T.hPutStrLn h msg
+--
+-- applyMigration :: Connection -> IO ()
+-- applyMigration conn =
+--   void . runMigration $
+--     MigrationContext MigrationInitialization (MyLogger stderr) conn
+-- @
+class MigrationVerbosity verbosity where
+    migrationLogWrite
+        :: MonadIO m
+        => verbosity
+        -> Either T.Text T.Text
+        -- ^ Either 'Left' for error log (e.g. stderr)
+        -- or 'Right' for info log (e.g. stdout)
+        -> m ()
+
+-- | Default log write implementaion.
+--
+-- Either 'False' for quite mode or 'True' for verbose mode.
+instance MigrationVerbosity Bool where
+    migrationLogWrite False _          = pure ()
+    migrationLogWrite True (Left  msg) = liftIO $ T.hPutStrLn stderr msg
+    migrationLogWrite True (Right msg) = liftIO $ T.putStrLn msg
