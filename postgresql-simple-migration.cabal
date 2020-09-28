@@ -43,11 +43,12 @@ Library
                             cryptohash                  >= 0.11     && < 0.12,
                             directory                   >= 1.2      && < 1.4,
                             postgresql-simple           >= 0.4      && < 0.7,
-                            time                        >= 1.4      && < 1.10
+                            time                        >= 1.4      && < 1.10,
+                            unliftio                    >= 0.2      && < 0.3
 
 Executable migrate
     main-is:                Main.hs
-    hs-source-dirs:         src
+    hs-source-dirs:         app
     ghc-options:            -Wall -fwarn-tabs -fwarn-incomplete-uni-patterns
     default-extensions:     OverloadedStrings, CPP, LambdaCase
     default-language:       Haskell2010
@@ -58,7 +59,8 @@ Executable migrate
                             directory                   >= 1.2      && < 1.4,
                             postgresql-simple           >= 0.4      && < 0.7,
                             time                        >= 1.4      && < 1.10,
-                            text                        >= 1.2      && < 1.3
+                            text                        >= 1.2      && < 1.3,
+                            postgresql-simple-migration -any
 
 test-suite tests
     main-is:                Main.hs
@@ -72,4 +74,4 @@ test-suite tests
                             bytestring                  >= 0.10     && < 0.11,
                             postgresql-simple           >= 0.4      && < 0.7,
                             hspec                       >= 2.2      && < 2.8,
-                            postgresql-simple-migration
+                            postgresql-simple-migration -any

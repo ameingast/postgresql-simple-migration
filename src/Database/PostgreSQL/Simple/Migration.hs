@@ -12,8 +12,6 @@
 -- For usage, see Readme.markdown.
 
 {-# LANGUAGE CPP               #-}
-{-# LANGUAGE DeriveFoldable    #-}
-{-# LANGUAGE DeriveFunctor     #-}
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -44,12 +42,11 @@ module Database.PostgreSQL.Simple.Migration
 import           Control.Applicative                ((<$>), (<*>))
 #endif
 import           Control.Monad                      (void, when)
+import           Control.Monad.IO.Class             (MonadIO (liftIO))
 import qualified Crypto.Hash.MD5                    as MD5 (hash)
 import qualified Data.ByteString                    as BS (ByteString, readFile)
 import qualified Data.ByteString.Base64             as B64 (encode)
-import           Data.Foldable                      (Foldable)
 import           Data.List                          (isPrefixOf, sort)
-import           Data.Traversable                   (Traversable)
 #if __GLASGOW_HASKELL__ < 710
 import           Data.Monoid                        (Monoid (..))
 #endif
@@ -71,7 +68,7 @@ import           System.Directory                   (getDirectoryContents)
 -- a 'MigrationError' is returned.
 --
 -- It is recommended to wrap 'runMigration' inside a database transaction.
-runMigration :: MigrationContext -> IO (MigrationResult String)
+runMigration :: MonadIO m => MigrationContext -> m (MigrationResult String)
 runMigration (MigrationContext cmd verbose con) = case cmd of
     MigrationInitialization ->
         initializeSchema con verbose >> return MigrationSuccess
@@ -80,7 +77,7 @@ runMigration (MigrationContext cmd verbose con) = case cmd of
     MigrationScript name contents ->
         executeMigration con verbose name contents
     MigrationFile name path ->
-        executeMigration con verbose name =<< BS.readFile path
+        executeMigration con verbose name =<< liftIO (BS.readFile path)
     MigrationValidation validationCmd ->
         executeValidation con verbose validationCmd
     MigrationCommands commands ->
@@ -94,18 +91,23 @@ runMigration (MigrationContext cmd verbose con) = case cmd of
 --
 -- It is recommended to wrap 'runMigrations' inside a database transaction.
 runMigrations
-    :: Bool
+    :: MonadIO m
+    => Bool
        -- ^ Run in verbose mode
     -> Connection
        -- ^ The postgres connection to use
     -> [MigrationCommand]
        -- ^ The commands to run
-    -> IO (MigrationResult String)
+    -> m (MigrationResult String)
 runMigrations verbose con commands =
-    sequenceMigrations [runMigration (MigrationContext c verbose con) | c <- commands]
+    sequenceMigrations
+        [runMigration (MigrationContext c verbose con) | c <- commands]
 
 -- | Run a sequence of contexts, stopping on the first failure
-sequenceMigrations :: Monad m => [m (MigrationResult e)] -> m (MigrationResult e)
+sequenceMigrations
+    :: Monad m
+    => [m (MigrationResult e)]
+    -> m (MigrationResult e)
 sequenceMigrations = \case
     []   -> return MigrationSuccess
     c:cs -> do
@@ -116,35 +118,48 @@ sequenceMigrations = \case
 
 -- | Executes all SQL-file based migrations located in the provided 'dir'
 -- in alphabetical order.
-executeDirectoryMigration :: Connection -> Bool -> FilePath -> IO (MigrationResult String)
+executeDirectoryMigration
+    :: MonadIO m
+    => Connection
+    -> Bool
+    -> FilePath
+    -> m (MigrationResult String)
 executeDirectoryMigration con verbose dir =
     scriptsInDirectory dir >>= go
     where
         go fs = sequenceMigrations (executeMigrationFile <$> fs)
-        executeMigrationFile f = executeMigration con verbose f =<< BS.readFile (dir ++ "/" ++ f)
+        executeMigrationFile f =
+            executeMigration con verbose f
+                =<< liftIO (BS.readFile $ dir ++ "/" ++ f)
 
 -- | Lists all files in the given 'FilePath' 'dir' in alphabetical order.
-scriptsInDirectory :: FilePath -> IO [String]
+scriptsInDirectory :: MonadIO m => FilePath -> m [String]
 scriptsInDirectory dir =
-    fmap (sort . filter (\x -> not $ "." `isPrefixOf` x))
-        (getDirectoryContents dir)
+    sort . filter (\x -> not $ "." `isPrefixOf` x)
+        <$> liftIO (getDirectoryContents dir)
 
 -- | Executes a generic SQL migration for the provided script 'name' with
 -- content 'contents'.
-executeMigration :: Connection -> Bool -> ScriptName -> BS.ByteString -> IO (MigrationResult String)
+executeMigration
+    :: MonadIO m
+    => Connection
+    -> Bool
+    -> ScriptName
+    -> BS.ByteString
+    -> m (MigrationResult String)
 executeMigration con verbose name contents = do
     let checksum = md5Hash contents
     checkScript con name checksum >>= \case
         ScriptOk -> do
-            when verbose $ putStrLn $ "Ok:\t" ++ name
+            when verbose $ liftIO $ putStrLn $ "Ok:\t" ++ name
             return MigrationSuccess
         ScriptNotExecuted -> do
-            void $ execute_ con (Query contents)
-            void $ execute con q (name, checksum)
-            when verbose $ putStrLn $ "Execute:\t" ++ name
+            void $ liftIO $ execute_ con (Query contents)
+            void $ liftIO $ execute con q (name, checksum)
+            when verbose $ liftIO $ putStrLn $ "Execute:\t" ++ name
             return MigrationSuccess
         ScriptModified { actual, expected } -> do
-            when verbose $ putStrLn
+            when verbose $ liftIO $ putStrLn
               $ "Fail:\t" ++ name
               ++ "\n" ++ scriptModifiedErrorMessage expected actual
             return (MigrationError name)
@@ -153,10 +168,10 @@ executeMigration con verbose name contents = do
 
 -- | Initializes the database schema with a helper table containing
 -- meta-information about executed migrations.
-initializeSchema :: Connection -> Bool -> IO ()
+initializeSchema :: MonadIO m => Connection -> Bool -> m ()
 initializeSchema con verbose = do
-    when verbose $ putStrLn "Initializing schema"
-    void $ execute_ con $ mconcat
+    when verbose $ liftIO $ putStrLn "Initializing schema"
+    void $ liftIO $ execute_ con $ mconcat
         [ "create table if not exists schema_migrations "
         , "( filename varchar(512) not null"
         , ", checksum varchar(32) not null"
@@ -174,8 +189,14 @@ initializeSchema con verbose = do
 -- * 'MigrationScript': validate the presence and checksum of the given script.
 -- * 'MigrationFile': validate the presence and checksum of the given file.
 -- * 'MigrationValidation': always succeeds.
--- * 'MigrationCommands': validates all the sub-commands stopping at the first failure.
-executeValidation :: Connection -> Bool -> MigrationCommand -> IO (MigrationResult String)
+-- * 'MigrationCommands': validates all the sub-commands stopping at the first
+-- failure.
+executeValidation
+    :: MonadIO m
+    => Connection
+    -> Bool
+    -> MigrationCommand
+    -> m (MigrationResult String)
 executeValidation con verbose cmd = case cmd of
     MigrationInitialization ->
         existsTable con "schema_migrations" >>= \r -> return $ if r
@@ -186,7 +207,7 @@ executeValidation con verbose cmd = case cmd of
     MigrationScript name contents ->
         validate name contents
     MigrationFile name path ->
-        validate name =<< BS.readFile path
+        validate name =<< liftIO (BS.readFile path)
     MigrationValidation _ ->
         return MigrationSuccess
     MigrationCommands cs ->
@@ -195,42 +216,47 @@ executeValidation con verbose cmd = case cmd of
         validate name contents =
             checkScript con name (md5Hash contents) >>= \case
                 ScriptOk -> do
-                    when verbose $ putStrLn $ "Ok:\t" ++ name
+                    when verbose $ liftIO $ putStrLn $ "Ok:\t" ++ name
                     return MigrationSuccess
                 ScriptNotExecuted -> do
-                    when verbose $ putStrLn $ "Missing:\t" ++ name
+                    when verbose $ liftIO $ putStrLn $ "Missing:\t" ++ name
                     return (MigrationError $ "Missing: " ++ name)
                 ScriptModified { expected, actual } -> do
-                    when verbose $ putStrLn
+                    when verbose $ liftIO $ putStrLn
                       $ "Checksum mismatch:\t" ++ name
                       ++ "\n" ++ scriptModifiedErrorMessage expected actual
                     return (MigrationError $ "Checksum mismatch: " ++ name)
 
         goScripts path xs = sequenceMigrations (goScript path <$> xs)
-        goScript path x = validate x =<< BS.readFile (path ++ "/" ++ x)
+        goScript path x = validate x =<< liftIO (BS.readFile $ path ++ "/" ++ x)
 
 -- | Checks the status of the script with the given name 'name'.
 -- If the script has already been executed, the checksum of the script
 -- is compared against the one that was executed.
 -- If there is no matching script entry in the database, the script
 -- will be executed and its meta-information will be recorded.
-checkScript :: Connection -> ScriptName -> Checksum -> IO CheckScriptResult
+checkScript
+    :: MonadIO m
+    => Connection
+    -> ScriptName
+    -> Checksum
+    -> m CheckScriptResult
 checkScript con name fileChecksum =
-    query con q (Only name) >>= \case
-        [] ->
-            return ScriptNotExecuted
-        Only dbChecksum:_ | fileChecksum == dbChecksum ->
-            return ScriptOk
-        Only dbChecksum:_ ->
-            return (ScriptModified {
-                       expected = dbChecksum,
-                       actual = fileChecksum
-                    })
+    f <$> liftIO (query con q $ Only name)
     where
         q = mconcat
             [ "select checksum from schema_migrations "
             , "where filename = ? limit 1"
             ]
+
+        f [] = ScriptNotExecuted
+        f (Only dbChecksum:_)
+            | fileChecksum == dbChecksum = ScriptOk
+            | otherwise =
+                ScriptModified
+                    { expected = dbChecksum
+                    , actual   = fileChecksum
+                    }
 
 -- | Calculates the MD5 checksum of the provided bytestring in base64
 -- encoding.
@@ -270,7 +296,8 @@ instance Semigroup MigrationCommand where
 
 instance Monoid MigrationCommand where
     mempty = MigrationCommands []
-    mappend (MigrationCommands xs) (MigrationCommands ys) = MigrationCommands (xs ++ ys)
+    mappend (MigrationCommands xs) (MigrationCommands ys) =
+        MigrationCommands (xs ++ ys)
     mappend (MigrationCommands xs) y = MigrationCommands (xs ++ [y])
     mappend x (MigrationCommands ys) = MigrationCommands (x : ys)
     mappend x y = MigrationCommands [x, y]

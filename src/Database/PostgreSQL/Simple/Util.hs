@@ -10,7 +10,6 @@
 -- A collection of utilites for database migrations.
 
 {-# LANGUAGE CPP               #-}
-{-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Database.PostgreSQL.Simple.Util
@@ -18,15 +17,17 @@ module Database.PostgreSQL.Simple.Util
     , withTransactionRolledBack
     ) where
 
-import           Control.Exception          (finally)
+import           Control.Monad.IO.Class     (MonadIO (liftIO))
+import           UnliftIO                   (MonadUnliftIO)
+import           UnliftIO.Exception         (finally)
 import           Database.PostgreSQL.Simple (Connection, Only (..), begin,
                                              query, rollback)
 import           GHC.Int                    (Int64)
 
 -- | Checks if the table with the given name exists in the database.
-existsTable :: Connection -> String -> IO Bool
+existsTable :: MonadIO m => Connection -> String -> m Bool
 existsTable con table =
-    fmap checkRowCount (query con q (Only table) :: IO [[Int64]])
+    checkRowCount <$> liftIO (query con q (Only table) :: IO [[Int64]])
     where
         q = "select count(relname) from pg_class where relname = ?"
 
@@ -36,6 +37,6 @@ existsTable con table =
 
 -- | Executes the given IO monad inside a transaction and performs a roll-back
 -- afterwards (even if exceptions occur).
-withTransactionRolledBack :: Connection -> IO a -> IO a
+withTransactionRolledBack :: MonadUnliftIO m => Connection -> m a -> m a
 withTransactionRolledBack con f =
-    begin con >> finally f (rollback con)
+    liftIO (begin con) >> finally f (liftIO $ rollback con)
