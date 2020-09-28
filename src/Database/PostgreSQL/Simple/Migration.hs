@@ -390,7 +390,7 @@ instance ToRow SchemaMigration where
 -- data MyLogger = MyLogger Handle
 --
 -- instance MigrationVerbosity MyLogger where
---   migrationLogWrite (MyLogger h) = liftIO $ T.hPutStrLn h msg
+--   migrationLogWrite (MyLogger h) = liftIO . T.hPutStrLn h . either id id
 --
 -- applyMigration :: Connection -> IO ()
 -- applyMigration conn =

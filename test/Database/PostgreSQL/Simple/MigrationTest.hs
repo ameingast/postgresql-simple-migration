@@ -10,13 +10,16 @@
 -- A collection of postgresql-simple-migration specifications.
 
 {-# LANGUAGE CPP               #-}
-{-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Database.PostgreSQL.Simple.MigrationTest where
 
+import           Data.IORef
+import           Data.Text                            (Text)
+import           Control.Monad.IO.Class               (liftIO)
 import           Database.PostgreSQL.Simple           (Connection)
 import           Database.PostgreSQL.Simple.Migration (MigrationCommand (..),
+                                                       MigrationVerbosity (..),
                                                        MigrationContext (..),
                                                        MigrationResult (..),
                                                        SchemaMigration (..),
@@ -26,7 +29,7 @@ import           Database.PostgreSQL.Simple.Util      (existsTable)
 import           Test.Hspec                           (Spec, describe, it,
                                                        shouldBe)
 
-migrationSpec:: Connection -> Spec
+migrationSpec :: Connection -> Spec
 migrationSpec con = describe "Migrations" $ do
     let migrationScript = MigrationScript "test.sql" q
     let migrationScriptAltered = MigrationScript "test.sql" ""
@@ -107,6 +110,17 @@ migrationSpec con = describe "Migrations" $ do
         r <- getMigrations con
         map schemaMigrationName r `shouldBe` ["test.sql", "1.sql", "s.sql"]
 
+    it "log can be redirected" $ do
+      ref <- newIORef mempty
+      _ <- runMigration $ MigrationContext
+          MigrationInitialization (TestLogger ref) con
+      readIORef ref >>= (`shouldBe` "Initializing schema")
+
     where
         q = "create table t1 (c1 varchar);"
 
+newtype TestLogger = TestLogger (IORef Text)
+
+instance MigrationVerbosity TestLogger where
+  migrationLogWrite (TestLogger ref) =
+    liftIO . modifyIORef ref . (<>) . either id id
