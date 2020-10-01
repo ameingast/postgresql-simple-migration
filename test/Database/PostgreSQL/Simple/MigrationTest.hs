@@ -10,18 +10,19 @@
 -- A collection of postgresql-simple-migration specifications.
 
 {-# LANGUAGE CPP               #-}
-{-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Database.PostgreSQL.Simple.MigrationTest where
 
+import           Data.IORef
 import           Database.PostgreSQL.Simple           (Connection)
 import           Database.PostgreSQL.Simple.Migration (MigrationCommand (..),
                                                        MigrationContext (..),
                                                        MigrationResult (..),
                                                        SchemaMigration (..),
                                                        getMigrations,
-                                                       runMigration)
+                                                       runMigration,
+                                                       runMigrationA)
 import           Database.PostgreSQL.Simple.Util      (existsTable)
 import           Test.Hspec                           (Spec, describe, it,
                                                        shouldBe)
@@ -106,6 +107,13 @@ migrationSpec con = describe "Migrations" $ do
     it "gets a list of executed migrations" $ do
         r <- getMigrations con
         map schemaMigrationName r `shouldBe` ["test.sql", "1.sql", "s.sql"]
+
+    it "log can be redirected" $ do
+        ref <- newIORef mempty
+        let logWrite = modifyIORef ref . (<>) . show
+        _ <- runMigrationA logWrite $ MigrationContext
+            MigrationInitialization True con
+        readIORef ref >>= (`shouldBe` "Right \"Initializing schema\"")
 
     where
         q = "create table t1 (c1 varchar);"
