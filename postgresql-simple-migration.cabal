@@ -38,7 +38,7 @@ Library
     default-extensions:     OverloadedStrings, CPP, LambdaCase
     default-language:       Haskell2010
     build-depends:          base                        >= 4.6      && < 5.0,
-                            base64-bytestring           >= 1.0      && < 1.1,
+                            base64-bytestring           >= 1.0      && < 1.3,
                             bytestring                  >= 0.10     && < 0.11,
                             cryptohash                  >= 0.11     && < 0.12,
                             directory                   >= 1.2      && < 1.4,
@@ -52,7 +52,7 @@ Executable migrate
     default-extensions:     OverloadedStrings, CPP, LambdaCase
     default-language:       Haskell2010
     build-depends:          base                        >= 4.6      && < 5.0,
-                            base64-bytestring           >= 1.0      && < 1.1,
+                            base64-bytestring           >= 1.0      && < 1.3,
                             bytestring                  >= 0.10     && < 0.11,
                             cryptohash                  >= 0.11     && < 0.12,
                             directory                   >= 1.2      && < 1.4,
